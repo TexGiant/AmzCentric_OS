@@ -1,0 +1,41 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+
+const PUBLIC = ["/login", "/auth/", "/api/cron/", "/account/set-password"];
+
+/** Refreshes the Supabase session cookie and sends signed-out visitors to /login. */
+export async function proxy(request: NextRequest) {
+  const demo = process.env.DEMO_MODE === "true" || !process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (demo) return NextResponse.next();
+
+  let response = NextResponse.next({ request });
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(toSet) {
+        toSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
+    },
+  });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const path = request.nextUrl.pathname;
+  if (!user && !PUBLIC.some((p) => path.startsWith(p))) {
+    if (path.startsWith("/api/")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = path === "/" ? "" : `?next=${encodeURIComponent(path)}`;
+    return NextResponse.redirect(url);
+  }
+  return response;
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:png|jpg|svg|webp)$).*)"],
+};
