@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, Kpi, PageHeader, cn } from "@/components/ui";
+import { Card, CardHeader, Kpi, PageHeader, Progress, buttonClass, cn } from "@/components/ui";
 import { Legend, PaceChart } from "@/components/charts";
 import { GoalForm } from "@/components/forms";
 import { data } from "@/lib/data";
@@ -62,11 +62,11 @@ export default async function GoalsPage({ params, searchParams }: { params: Bran
         subtitle={`${brand.name} · ${elapsed} of ${dim} days · ${hasTotal ? "total sales" : "ad sales (total sales arrive with SP-API)"}`}
         right={
           <div className="flex gap-1">
-            <Link href={`/dashboard/${slug}/goals?month=${shiftMonth(month, -1)}`} className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-muted hover:text-ink">
+            <Link href={`/dashboard/${slug}/goals?month=${shiftMonth(month, -1)}`} className={cn(buttonClass.secondary, buttonClass.small)}>
               ← Previous
             </Link>
             {month < current && (
-              <Link href={`/dashboard/${slug}/goals?month=${shiftMonth(month, 1)}`} className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-muted hover:text-ink">
+              <Link href={`/dashboard/${slug}/goals?month=${shiftMonth(month, 1)}`} className={cn(buttonClass.secondary, buttonClass.small)}>
                 Next →
               </Link>
             )}
@@ -101,12 +101,12 @@ export default async function GoalsPage({ params, searchParams }: { params: Bran
               items={[
                 { label: "Actual", color: "var(--color-series-sales)" },
                 { label: "Projected", color: "var(--color-series-sales)", dashed: true },
-                { label: "Target pace", color: "#94a3b8", dashed: true },
+                { label: "Target pace", color: "#f8a42e", dashed: true },
               ]}
             />
           }
         />
-        <div className="px-3 pb-4">
+        <div className="px-3 pt-5 pb-4">
           <PaceChart data={chart} />
         </div>
       </Card>
@@ -122,17 +122,24 @@ export default async function GoalsPage({ params, searchParams }: { params: Bran
 function PaceBar({ label, value, goodAbove = false }: { label: string; value: number | null; goodAbove?: boolean }) {
   const v = value ?? 0;
   const ok = goodAbove ? v >= 0.97 : v <= 1.03;
+  const close = goodAbove ? v >= 0.85 : v <= 1.15;
+  const tone = value == null ? "brand" : ok ? "good" : close ? "brand" : "bad";
   return (
-    <Card className="px-5 py-4">
+    <Card className="px-6 py-5">
       <div className="flex items-center justify-between text-sm">
-        <span className="font-medium text-ink">{label}</span>
-        <span className={cn("font-semibold tabular", value == null ? "text-faint" : ok ? "text-good" : "text-warn")}>
+        <span className="font-bold text-ink">{label}</span>
+        <span className={cn("font-bold tabular", value == null ? "text-faint" : { good: "text-good", brand: "text-brand-ink", bad: "text-bad" }[tone])}>
           {value == null ? "Set a target" : `${pct(v, 0)} of expected`}
         </span>
       </div>
-      <div className="relative mt-3 h-2 rounded-full bg-canvas">
-        <div className={cn("h-2 rounded-full", ok ? "bg-good" : "bg-warn")} style={{ width: `${Math.min(100, v * 66.7)}%` }} />
-        <div className="absolute top-[-3px] h-3.5 w-0.5 bg-ink" style={{ left: "66.7%" }} title="On pace" />
+      <div className="relative mt-3">
+        <Progress value={v / 1.5} tone={tone} />
+        <div className="absolute -top-1 h-3.5 w-0.5 rounded-full bg-navy-800" style={{ left: "66.7%" }} title="On pace" />
+      </div>
+      <div className="relative mt-2 h-4 text-[11px] font-semibold text-faint">
+        <span className="absolute -translate-x-1/2" style={{ left: "66.7%" }}>
+          On pace
+        </span>
       </div>
     </Card>
   );

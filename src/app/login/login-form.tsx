@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { buttonClass, inputClass } from "@/components/ui";
+import { buttonClass, cn, inputClass, labelClass } from "@/components/ui";
 
 export function LoginForm({ next, initialError }: { next: string; initialError?: string }) {
   const router = useRouter();
@@ -36,17 +36,23 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-5 space-y-3">
-      <input name="email" type="email" required placeholder="you@amzcentric.com" autoComplete="email" className={inputClass} />
-      <input name="password" type="password" required placeholder="Password" autoComplete="current-password" className={inputClass} />
-      {error && <p className="text-xs text-bad">{error}</p>}
-      {info && <p className="text-xs text-good">{info}</p>}
-      <button className={`${buttonClass.primary} w-full`} disabled={busy}>
+    <form onSubmit={onSubmit} className="mt-6 space-y-4">
+      <label className="block">
+        <span className={labelClass}>Work email</span>
+        <input name="email" type="email" required placeholder="you@amzcentric.com" autoComplete="email" className={inputClass} />
+      </label>
+      <label className="block">
+        <span className={labelClass}>Password</span>
+        <input name="password" type="password" required placeholder="••••••••••" autoComplete="current-password" className={inputClass} />
+      </label>
+      {error && <p className="text-xs font-semibold text-bad">{error}</p>}
+      {info && <p className="text-xs font-semibold text-good">{info}</p>}
+      <button className={cn(buttonClass.primary, "h-12 w-full text-base")} disabled={busy}>
         {busy ? "Signing in…" : "Sign in"}
       </button>
       <button
         type="button"
-        className="w-full text-center text-xs text-muted hover:text-ink"
+        className="w-full text-center text-xs font-semibold text-brand-ink hover:underline"
         onClick={(e) => resetPassword(String(new FormData(e.currentTarget.form!).get("email") ?? ""))}
       >
         Forgot password?

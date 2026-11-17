@@ -68,19 +68,19 @@ export default async function ActionLogPage({ params }: { params: BrandParams })
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-sm">
             <thead>
-              <tr className="border-y border-line bg-canvas/60 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
-                <th className="py-2.5 pr-3 pl-5 text-left">Date</th>
-                <th className="px-3 text-left">Change</th>
-                <th className="px-3 text-right">Sales/day before → after</th>
-                <th className="px-3 text-right">ACOS before → after</th>
-                <th className="px-3 text-left">Result</th>
-                <th className="pr-5" />
+              <tr className="border-b border-line bg-canvas text-[11px] font-bold tracking-[0.14em] text-muted uppercase">
+                <th className="py-3 pr-4 pl-6 text-left">Date</th>
+                <th className="px-4 text-left">Change</th>
+                <th className="px-4 text-right">Sales/day before → after</th>
+                <th className="px-4 text-right">ACOS before → after</th>
+                <th className="px-4 text-left">Result</th>
+                <th className="pr-6" />
               </tr>
             </thead>
             <tbody>
               {measured.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-muted">
+                  <td colSpan={6} className="px-6 py-12 text-center text-muted">
                     No actions yet. Log bids, budgets, negatives and listing changes above to measure their impact.
                   </td>
                 </tr>
@@ -92,31 +92,31 @@ export default async function ActionLogPage({ params }: { params: BrandParams })
                 const aB = before ? acos(before) : null;
                 const aA = after ? acos(after) : null;
                 return (
-                  <tr key={a.id} className="border-b border-line/70 align-top last:border-0">
-                    <td className="py-3 pr-3 pl-5 whitespace-nowrap text-ink-2">{shortDate(a.actionDate)}</td>
-                    <td className="px-3 py-3">
+                  <tr key={a.id} className="border-b border-line align-top transition-colors last:border-0 hover:bg-canvas">
+                    <td className="py-4 pr-4 pl-6 font-semibold whitespace-nowrap text-ink">{shortDate(a.actionDate)}</td>
+                    <td className="px-4 py-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <Pill tone="brand">{label(a.category)}</Pill>
                         <span className="text-xs text-faint">{a.campaignName ?? "Whole brand"}</span>
                       </div>
-                      <div className="mt-1 text-ink">{a.description}</div>
+                      <div className="mt-1.5 font-semibold text-ink">{a.description}</div>
                       {a.authorEmail && <div className="text-xs text-faint">{a.authorEmail}</div>}
                     </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap tabular">
+                    <td className="px-4 py-4 text-right whitespace-nowrap tabular">
                       {spdB == null ? "—" : `${money(spdB)} → ${money(spdA)}`}
                     </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap tabular">{aB == null ? "—" : `${pct(aB)} → ${pct(aA)}`}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-4 py-4 text-right whitespace-nowrap tabular">{aB == null ? "—" : `${pct(aB)} → ${pct(aA)}`}</td>
+                    <td className="px-4 py-4 whitespace-nowrap">
                       {!after ? (
-                        <Pill>Measuring · day {Math.max(afterDays, 0)}</Pill>
+                        <Pill tone="warn" dot>Measuring · day {Math.max(afterDays, 0)}</Pill>
                       ) : (
-                        <span className={cn("text-xs font-semibold", (d ?? 0) > 0.05 ? "text-good" : (d ?? 0) < -0.05 ? "text-bad" : "text-muted")}>
+                        <span className={cn("text-xs font-bold", (d ?? 0) > 0.05 ? "text-good" : (d ?? 0) < -0.05 ? "text-bad" : "text-muted")}>
                           {d == null ? "—" : `${d > 0 ? "+" : ""}${(d * 100).toFixed(0)}% sales/day`}
                           {afterDays < WINDOW && <span className="ml-1 font-normal text-faint">({afterDays}d so far)</span>}
                         </span>
                       )}
                     </td>
-                    <td className="pr-5 text-right">
+                    <td className="py-3 pr-6 text-right">
                       <form action={deleteAction}>
                         <input type="hidden" name="id" value={a.id} />
                         <input type="hidden" name="brand" value={slug} />

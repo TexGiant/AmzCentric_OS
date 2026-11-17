@@ -1,5 +1,5 @@
 import { PlugZap } from "lucide-react";
-import { Card, CardHeader, Empty, PageHeader, Pill, buttonClass, inputClass } from "@/components/ui";
+import { Alert, Card, CardHeader, Empty, PageHeader, Pill, buttonClass, cn, inputClass, selectClass } from "@/components/ui";
 import { disconnectAccount, renameAccount, updateProfile } from "@/app/settings-actions";
 import { requireUser } from "@/lib/auth";
 import { REGIONS, type Region } from "@/lib/amazon/ads";
@@ -50,14 +50,14 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
         ))}
       />
       {error && (
-        <div className="mb-4 rounded-xl border border-bad/20 bg-bad-soft px-4 py-3 text-sm text-bad">
-          {error === "demo" ? "Demo mode: add Supabase + Amazon credentials to connect real accounts." : error}
-        </div>
+        <Alert tone={error === "demo" ? "warn" : "bad"} title={error === "demo" ? "Demo mode" : "Connection failed"}>
+          {error === "demo" ? "Add Supabase and Amazon Ads credentials to connect real accounts." : error}
+        </Alert>
       )}
       {connected && (
-        <div className="mb-4 rounded-xl border border-good/20 bg-good-soft px-4 py-3 text-sm text-good">
-          Connected. Imported {connected} advertising profile(s). Enable the ones you manage and assign them to brands.
-        </div>
+        <Alert tone="good" title="Amazon account connected">
+          Imported {connected} advertising profile(s). Enable the ones you manage and assign them to brands.
+        </Alert>
       )}
 
       {accounts.length === 0 && (
@@ -75,11 +75,11 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
           const enabled = a.amazon_profiles.filter((p) => p.enabled).length;
           return (
             <Card key={a.id}>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-4">
                 <form action={renameAccount} className="flex items-center gap-2">
                   <input type="hidden" name="id" value={a.id} />
-                  <input name="name" defaultValue={a.name} className={`${inputClass} w-64 font-medium`} aria-label="Account name" />
-                  <button className="text-xs font-medium text-brand hover:underline">Rename</button>
+                  <input name="name" defaultValue={a.name} className={cn(inputClass, "w-64 font-semibold")} aria-label="Account name" />
+                  <button className={cn(buttonClass.ghost, buttonClass.small)}>Rename</button>
                 </form>
                 <div className="flex items-center gap-2">
                   <Pill tone="brand">{REGIONS[a.region].label}</Pill>
@@ -94,13 +94,13 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
                   )}
                 </div>
               </div>
-              {a.last_error && <div className="bg-bad-soft px-5 py-2 text-xs text-bad">{a.last_error}</div>}
+              {a.last_error && <div className="border-b border-line bg-bad-soft px-6 py-2.5 text-xs font-semibold text-bad-ink">{a.last_error}</div>}
               <CardHeader title="Advertising profiles" />
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-sm">
                   <thead>
-                    <tr className="border-y border-line bg-canvas/60 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
-                      <th className="py-2.5 pr-3 pl-5">Profile</th>
+                    <tr className="border-b border-line bg-canvas text-left text-[11px] font-bold tracking-[0.14em] text-muted uppercase">
+                      <th className="py-3 pr-4 pl-6">Profile</th>
                       <th className="pr-5 pl-3" colSpan={4}>
                         Display name · Brand · Enabled
                       </th>
@@ -110,9 +110,9 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
                     {[...a.amazon_profiles]
                       .sort((x, y) => Number(y.enabled) - Number(x.enabled) || (x.account_name ?? "").localeCompare(y.account_name ?? ""))
                       .map((p) => (
-                        <tr key={p.profile_id} className="border-b border-line/70 last:border-0">
-                          <td className="py-2.5 pr-3 pl-5">
-                            <div className="font-medium text-ink">
+                        <tr key={p.profile_id} className="border-b border-line transition-colors last:border-0 hover:bg-canvas">
+                          <td className="py-3 pr-4 pl-6">
+                            <div className="font-semibold text-ink">
                               {p.account_name ?? p.profile_id} <span className="text-faint">· {p.country_code}</span>
                             </div>
                             <div className="text-xs text-faint">
@@ -122,8 +122,8 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
                           <td className="pr-5 pl-3" colSpan={4}>
                             <form action={updateProfile} className="flex items-center gap-3">
                               <input type="hidden" name="profile_id" value={p.profile_id} />
-                              <input name="display_name" defaultValue={p.display_name ?? ""} placeholder="optional" className={`${inputClass} w-44`} />
-                              <select name="brand_slug" defaultValue={p.brand_slug ?? ""} className={`${inputClass} w-48`}>
+                              <input name="display_name" defaultValue={p.display_name ?? ""} placeholder="Display name" className={cn(inputClass, "w-44")} />
+                              <select name="brand_slug" defaultValue={p.brand_slug ?? ""} className={cn(selectClass, "w-48")}>
                                 <option value="">— Unassigned —</option>
                                 {brands.map((b) => (
                                   <option key={b.slug} value={b.slug}>
@@ -131,8 +131,11 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
                                   </option>
                                 ))}
                               </select>
-                              <input type="checkbox" name="enabled" defaultChecked={p.enabled} className="size-4 accent-[var(--color-brand)]" />
-                              <button className="ml-auto text-xs font-medium text-brand hover:underline">Save</button>
+                              <label className="inline-flex items-center gap-2 text-sm font-semibold text-ink-2">
+                                <input type="checkbox" name="enabled" defaultChecked={p.enabled} className="amz-check" />
+                                Enabled
+                              </label>
+                              <button className={cn(buttonClass.secondary, buttonClass.small, "ml-auto")}>Save</button>
                             </form>
                           </td>
                         </tr>

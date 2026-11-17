@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Tags } from "lucide-react";
-import { Card, CardHeader, Delta, Empty, Kpi, PageHeader, RangeTabs, buttonClass } from "@/components/ui";
+import { Card, CardHeader, Delta, Empty, Eyebrow, NavyPanel, NavyStat, PageHeader, RangeTabs, buttonClass } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
 import { resolveRange } from "@/lib/dates";
@@ -52,28 +52,31 @@ export default async function AllBrandsPage({ searchParams }: { searchParams: Se
         right={<RangeTabs basePath="/dashboard" current={range.days} />}
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Kpi label="Ad spend" value={money(total.cost)} delta={change(total.cost, totalPrev.cost)} invert />
-        <Kpi label="Ad sales" value={money(total.sales)} delta={change(total.sales, totalPrev.sales)} />
-        <Kpi label="Total sales" value={money(total.totalSales)} delta={change(total.totalSales, totalPrev.totalSales)} />
-        <Kpi label="ACOS" value={pct(acos(total))} delta={change(acos(total), acos(totalPrev))} invert />
-        <Kpi label="TACOS" value={pct(tacos(total))} delta={change(tacos(total), tacos(totalPrev))} invert />
-      </div>
+      <NavyPanel className="p-6 sm:p-8">
+        <Eyebrow onDark>Portfolio · {range.days} days</Eyebrow>
+        <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-3 xl:grid-cols-5">
+          <NavyStat label="Total sales" value={money(total.totalSales)} delta={change(total.totalSales, totalPrev.totalSales)} />
+          <NavyStat label="Ad sales" value={money(total.sales)} delta={change(total.sales, totalPrev.sales)} />
+          <NavyStat label="Ad spend" value={money(total.cost)} delta={change(total.cost, totalPrev.cost)} invert />
+          <NavyStat label="ACOS" value={pct(acos(total))} delta={change(acos(total), acos(totalPrev))} invert />
+          <NavyStat label="TACOS" value={pct(tacos(total))} delta={change(tacos(total), tacos(totalPrev))} invert />
+        </div>
+      </NavyPanel>
 
       <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {rows.map(({ b, now, prev }) => (
           <Link key={b.slug} href={`/dashboard/${b.slug}?range=${range.days}`} className="group">
-            <Card className="h-full p-5 transition-shadow group-hover:shadow-lg group-hover:shadow-ink/5">
+            <Card className="h-full p-6 transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-raised">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="font-semibold text-ink">{b.name}</div>
+                  <div className="text-[17px] font-bold text-ink">{b.name}</div>
                   <div className="text-xs text-muted">
                     {b.profileCount} profile{b.profileCount === 1 ? "" : "s"} · {b.countries.join(", ") || "no marketplaces"}
                   </div>
                 </div>
-                <ArrowRight className="size-4 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-brand" strokeWidth={1.5} />
+                <ArrowRight className="size-4 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-brand-ink" strokeWidth={1.5} />
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-3">
+              <div className="mt-5 grid grid-cols-3 gap-3 border-t border-line pt-4">
                 <Mini label="Ad sales" value={money(now.sales)} delta={change(now.sales, prev.sales)} />
                 <Mini label="Spend" value={money(now.cost)} delta={change(now.cost, prev.cost)} invert />
                 <Mini label="ACOS" value={pct(acos(now))} delta={change(acos(now), acos(prev))} invert />
@@ -114,8 +117,8 @@ export default async function AllBrandsPage({ searchParams }: { searchParams: Se
 function Mini({ label, value, delta, invert }: { label: string; value: string; delta: number | null; invert?: boolean }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">{label}</div>
-      <div className="mt-0.5 text-[17px] font-semibold text-ink tabular">{value}</div>
+      <div className="text-xs font-semibold text-muted">{label}</div>
+      <div className="mt-1 font-display text-[18px] font-bold text-ink tabular">{value}</div>
       <Delta value={delta} invert={invert} />
     </div>
   );

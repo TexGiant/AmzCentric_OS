@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Download, Search } from "lucide-react";
 import { formatValue, type FormatKind } from "@/lib/format";
-import { cn } from "@/components/ui";
+import { badgeClass, buttonClass, cn, type Tone } from "@/components/ui";
 
 export type Column = {
   key: string;
@@ -12,18 +12,13 @@ export type Column = {
   /** Color deltas: "up" means higher is good, "down" means lower is good. */
   tone?: "up" | "down";
   width?: string;
+  /** Render values as .amz-badge — maps value → tone (good | bad | warn | brand | info | neutral). */
   badge?: Record<string, string>;
+  badgeDot?: boolean;
 };
 
 type Row = Record<string, unknown>;
 
-const BADGE_TONES: Record<string, string> = {
-  good: "bg-good-soft text-good",
-  bad: "bg-bad-soft text-bad",
-  warn: "bg-warn-soft text-warn",
-  brand: "bg-brand-soft text-brand",
-  neutral: "bg-canvas text-muted",
-};
 
 export function DataTable({
   columns,
@@ -78,15 +73,15 @@ export function DataTable({
   return (
     <div>
       {(searchKeys || exportName) && (
-        <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3.5">
           {searchKeys ? (
             <label className="relative w-full max-w-xs">
-              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
+              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" strokeWidth={1.5} />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search…"
-                className="w-full rounded-xl border border-line bg-canvas py-2 pr-3 pl-9 text-sm focus:border-brand focus:bg-surface focus:outline-none"
+                className="h-10 w-full rounded-lg border border-line-strong bg-surface pr-3 pl-9 text-sm text-ink placeholder:text-faint hover:border-[rgb(0_15_34/0.48)] focus:border-brand focus:shadow-[var(--ring)] focus:outline-none"
               />
             </label>
           ) : (
@@ -95,8 +90,8 @@ export function DataTable({
           <div className="flex items-center gap-3 text-xs text-muted">
             <span>{filtered.length.toLocaleString()} rows</span>
             {exportName && (
-              <button onClick={exportCsv} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-medium text-ink-2 hover:bg-canvas">
-                <Download className="size-3.5" strokeWidth={1.5} /> CSV
+              <button onClick={exportCsv} className={cn(buttonClass.secondary, buttonClass.small)}>
+                <Download strokeWidth={1.5} /> Export CSV
               </button>
             )}
           </div>
@@ -105,7 +100,7 @@ export function DataTable({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
-            <tr className="border-y border-line bg-canvas/60">
+            <tr className={cn("border-b border-line bg-canvas", (searchKeys || exportName) && "border-t")}>
               {columns.map((c, i) => {
                 const numeric = c.format && c.format !== "text";
                 return (
@@ -113,10 +108,10 @@ export function DataTable({
                     key={c.key}
                     style={c.width ? { width: c.width } : undefined}
                     className={cn(
-                      "px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] whitespace-nowrap text-muted select-none",
+                      "px-4 py-3 text-[11px] font-bold tracking-[0.14em] whitespace-nowrap text-muted uppercase select-none",
                       numeric ? "text-right" : "text-left",
-                      i === 0 && "pl-5",
-                      i === columns.length - 1 && "pr-5",
+                      i === 0 && "pl-6",
+                      i === columns.length - 1 && "pr-6",
                     )}
                   >
                     <button onClick={() => toggle(c.key)} className={cn("inline-flex items-center gap-1 hover:text-ink", numeric && "flex-row-reverse")}>
@@ -131,7 +126,7 @@ export function DataTable({
           </thead>
           <tbody>
             {filtered.slice(0, limit).map((r, ri) => (
-              <tr key={ri} className="border-b border-line/70 last:border-0 hover:bg-canvas/50">
+              <tr key={ri} className="border-b border-line transition-colors last:border-0 hover:bg-canvas">
                 {columns.map((c, i) => {
                   const v = r[c.key];
                   const numeric = c.format && c.format !== "text";
@@ -144,15 +139,16 @@ export function DataTable({
                     <td
                       key={c.key}
                       className={cn(
-                        "px-3 py-2.5 align-top",
+                        "px-4 py-3.5 align-middle",
                         numeric ? "text-right whitespace-nowrap tabular" : "text-left",
-                        i === 0 && "pl-5 font-medium text-ink",
-                        i === columns.length - 1 && "pr-5",
+                        i === 0 && "pl-6 font-semibold text-ink",
+                        i === columns.length - 1 && "pr-6",
                         tone || (i === 0 ? "" : "text-ink-2"),
                       )}
                     >
                       {c.badge && v != null ? (
-                        <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-medium whitespace-nowrap", BADGE_TONES[c.badge[String(v)] ?? "neutral"])}>
+                        <span className={badgeClass((c.badge[String(v)] ?? "neutral") as Tone)}>
+                          {(c.badgeDot ?? true) && <span className="size-1.5 rounded-full bg-current" />}
                           {String(v)}
                         </span>
                       ) : (
@@ -166,10 +162,13 @@ export function DataTable({
           </tbody>
         </table>
       </div>
-      {filtered.length === 0 && <div className="px-5 py-10 text-center text-sm text-muted">{empty}</div>}
+      {filtered.length === 0 && <div className="px-6 py-12 text-center text-sm text-muted">{empty}</div>}
       {filtered.length > limit && (
-        <div className="border-t border-line px-5 py-3 text-center">
-          <button onClick={() => setLimit((l) => l + pageSize * 2)} className="text-sm font-medium text-brand hover:underline">
+        <div className="flex items-center justify-between border-t border-line px-6 py-3.5">
+          <span className="text-xs text-muted">
+            Showing 1–{limit} of {filtered.length.toLocaleString()}
+          </span>
+          <button onClick={() => setLimit((l) => l + pageSize * 2)} className={cn(buttonClass.ghost, buttonClass.small, "text-brand-ink")}>
             Show more ({(filtered.length - limit).toLocaleString()} remaining)
           </button>
         </div>

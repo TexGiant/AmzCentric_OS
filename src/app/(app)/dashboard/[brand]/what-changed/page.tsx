@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardHeader, Kpi, PageHeader } from "@/components/ui";
+import { Card, CardHeader, Kpi, PageHeader, Segmented } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
 import { data, ACTION_CATEGORIES } from "@/lib/data";
 import { resolveRange, shortDate } from "@/lib/dates";
@@ -9,7 +9,7 @@ import { salesDriver } from "@/lib/insights";
 import { getBrandOr404, param, type BrandParams, type SearchParams } from "@/lib/page";
 
 const ZERO: Totals = { impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0, units: 0 };
-const DRIVER_TONES = { Traffic: "brand", Conversion: "warn", "Order value": "neutral", Paused: "bad", New: "good", Flat: "neutral" };
+const DRIVER_TONES = { Traffic: "info", Conversion: "warn", "Order value": "neutral", Paused: "bad", New: "good", Flat: "neutral" };
 
 export default async function WhatChangedPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
@@ -81,38 +81,34 @@ export default async function WhatChangedPage({ params, searchParams }: { params
         title="Why did sales move?"
         subtitle={`${brand.name} · ${shortDate(range.from)}–${shortDate(range.to)} vs ${shortDate(range.prevFrom)}–${shortDate(range.prevTo)}`}
         right={
-          <div className="inline-flex rounded-full border border-line bg-surface p-0.5">
-            {[7, 14, 30].map((d) => (
-              <Link
-                key={d}
-                href={`/dashboard/${slug}/what-changed?range=${d}`}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${d === days ? "bg-ink text-white" : "text-muted hover:text-ink"}`}
-              >
-                {d === 7 ? "Week over week" : `${d}d vs prior`}
-              </Link>
-            ))}
-          </div>
+          <Segmented
+            items={[7, 14, 30].map((d) => ({
+              href: `/dashboard/${slug}/what-changed?range=${d}`,
+              label: d === 7 ? "Week over week" : `${d}D vs prior`,
+              active: d === days,
+            }))}
+          />
         }
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Kpi label="Ad sales" value={money(now.sales)} delta={change(now.sales, prev.sales)} />
-        <Kpi label="Spend" value={money(now.cost)} delta={change(now.cost, prev.cost)} invert />
-        <Kpi label="ACOS" value={pct(acos(now))} delta={change(acos(now), acos(prev))} invert />
-        <Kpi label="Clicks" value={now.clicks.toLocaleString()} delta={change(now.clicks, prev.clicks)} />
-        <Kpi label="CPC" value={money(cpc(now), 2)} delta={change(cpc(now), cpc(prev))} invert />
-        <Kpi label="CVR" value={pct(cvr(now))} delta={change(cvr(now), cvr(prev))} sub={`CTR ${pct(ctr(now), 2)}`} />
+        <Kpi size="sm" label="Ad sales" value={money(now.sales)} delta={change(now.sales, prev.sales)} />
+        <Kpi size="sm" label="Spend" value={money(now.cost)} delta={change(now.cost, prev.cost)} invert />
+        <Kpi size="sm" label="ACOS" value={pct(acos(now))} delta={change(acos(now), acos(prev))} invert />
+        <Kpi size="sm" label="Clicks" value={now.clicks.toLocaleString()} delta={change(now.clicks, prev.clicks)} />
+        <Kpi size="sm" label="CPC" value={money(cpc(now), 2)} delta={change(cpc(now), cpc(prev))} invert />
+        <Kpi size="sm" label="CVR" value={pct(cvr(now))} delta={change(cvr(now), cvr(prev))} sub={`CTR ${pct(ctr(now), 2)}`} />
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <Card className="px-5 py-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Gained</div>
-          <div className="mt-1 text-xl font-semibold text-good tabular">+{money(up)}</div>
-          <div className="text-xs text-muted">from {movers.filter((m) => m.salesChange > 0).length} campaigns that grew</div>
+        <Card className="px-6 py-5">
+          <div className="text-sm font-semibold text-muted">Gained</div>
+          <div className="mt-2 font-display text-[26px] leading-none font-bold text-good tabular">+{money(up)}</div>
+          <div className="mt-2 text-xs text-muted">from {movers.filter((m) => m.salesChange > 0).length} campaigns that grew</div>
         </Card>
-        <Card className="px-5 py-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Lost</div>
-          <div className="mt-1 text-xl font-semibold text-bad tabular">{money(down)}</div>
-          <div className="text-xs text-muted">from {movers.filter((m) => m.salesChange < 0).length} campaigns that shrank</div>
+        <Card className="px-6 py-5">
+          <div className="text-sm font-semibold text-muted">Lost</div>
+          <div className="mt-2 font-display text-[26px] leading-none font-bold text-bad tabular">{money(down)}</div>
+          <div className="mt-2 text-xs text-muted">from {movers.filter((m) => m.salesChange < 0).length} campaigns that shrank</div>
         </Card>
       </div>
 
@@ -158,19 +154,19 @@ export default async function WhatChangedPage({ params, searchParams }: { params
           <CardHeader
             title="Actions in this window"
             right={
-              <Link href={`/dashboard/${slug}/actions`} className="text-xs font-medium text-brand hover:underline">
+              <Link href={`/dashboard/${slug}/actions`} className="text-xs font-semibold text-brand-ink hover:underline">
                 Action log →
               </Link>
             }
           />
           <ul className="divide-y divide-line">
-            {windowActions.length === 0 && <li className="px-5 py-6 text-sm text-muted">No actions logged in these dates.</li>}
+            {windowActions.length === 0 && <li className="px-6 py-6 text-sm text-muted">No actions logged in these dates.</li>}
             {windowActions.map((a) => (
-              <li key={a.id} className="px-5 py-3">
+              <li key={a.id} className="px-6 py-3.5">
                 <div className="text-xs text-muted">
                   {shortDate(a.actionDate)} · {catLabel(a.category)}
                 </div>
-                <div className="text-sm text-ink">{a.description}</div>
+                <div className="mt-0.5 text-sm font-semibold text-ink">{a.description}</div>
                 {a.campaignName && <div className="truncate text-xs text-faint">{a.campaignName}</div>}
               </li>
             ))}

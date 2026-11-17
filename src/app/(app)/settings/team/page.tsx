@@ -1,4 +1,4 @@
-import { Card, CardHeader, PageHeader, Pill, buttonClass } from "@/components/ui";
+import { Avatar, Card, CardHeader, PageHeader, Pill, buttonClass, cn } from "@/components/ui";
 import { InviteForm } from "@/components/settings-forms";
 import { removeMember, setRole } from "@/app/settings-actions";
 import { requireAdmin } from "@/lib/auth";
@@ -43,25 +43,26 @@ export default async function TeamPage() {
       </Card>
       <Card className="mt-4">
         <CardHeader title={`${members.length} members`} />
-        <ul className="divide-y divide-line border-t border-line">
+        <ul className="divide-y divide-line">
           {members.map((m) => (
-            <li key={m.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+            <li key={m.id} className="flex flex-wrap items-center gap-3 px-6 py-4">
+              <Avatar email={m.email} tone={m.role === "admin" ? "gold" : "navy"} />
               <div className="min-w-0 flex-1">
-                <div className="font-medium text-ink">{m.email}</div>
+                <div className="font-semibold text-ink">{m.email}</div>
                 <div className="text-xs text-muted">
                   {m.lastSignIn ? `Last sign-in ${new Date(m.lastSignIn).toLocaleDateString("en-US")}` : "Never signed in"}
                 </div>
               </div>
-              {m.invited && <Pill tone="warn">Invite pending</Pill>}
+              {m.invited && <Pill tone="warn" dot>Invite pending</Pill>}
               {m.id === me.id ? (
-                <Pill tone="brand">{m.role} · you</Pill>
+                <Pill tone="solid">{m.role} · you</Pill>
               ) : (
                 <>
                   <form action={setRole} className="flex items-center gap-1">
                     <input type="hidden" name="user_id" value={m.id} />
                     <input type="hidden" name="role" value={m.role === "admin" ? "member" : "admin"} />
                     <Pill tone={m.role === "admin" ? "brand" : "neutral"}>{m.role}</Pill>
-                    <button className="text-xs font-medium text-brand hover:underline">Make {m.role === "admin" ? "member" : "admin"}</button>
+                    <button className={cn(buttonClass.ghost, buttonClass.small)}>Make {m.role === "admin" ? "member" : "admin"}</button>
                   </form>
                   <form action={removeMember}>
                     <input type="hidden" name="user_id" value={m.id} />

@@ -4,10 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Activity,
   BarChart3,
   Boxes,
-  ChevronsUpDown,
   Clock,
   Database,
   GitCompareArrows,
@@ -24,9 +22,10 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { cn, Logo } from "@/components/ui";
+import { Avatar, cn, Logo, selectClass } from "@/components/ui";
 
 type Brand = { slug: string; name: string; countries: string[] };
+type Item = { href: string; label: string; icon: React.ElementType; soon?: string; exact?: boolean };
 
 const STROKE = 1.5;
 
@@ -52,10 +51,10 @@ export function Sidebar({
   const current = brands.find((b) => b.slug === match?.[1]) ?? null;
   const slug = current?.slug ?? brands[0]?.slug;
 
-  const groups: Array<{ label: string; items: Array<{ href: string; label: string; icon: React.ElementType; soon?: string; exact?: boolean }> }> = slug
+  const groups: Array<{ label: string; items: Item[] }> = slug
     ? [
         {
-          label: "Overview",
+          label: "Workspace",
           items: [
             { href: `/dashboard/${slug}`, label: "Overview", icon: LayoutGrid, exact: true },
             { href: `/dashboard/${slug}/what-changed`, label: "What Changed", icon: GitCompareArrows },
@@ -71,20 +70,17 @@ export function Sidebar({
           ],
         },
         {
-          label: "Products & Market",
+          label: "Products & market",
           items: [
             { href: `/dashboard/${slug}/products`, label: "Products", icon: Package },
             { href: `/dashboard/${slug}/inventory`, label: "Inventory", icon: Boxes, soon: "SP-API" },
           ],
         },
-        {
-          label: "Work",
-          items: [{ href: `/dashboard/${slug}/actions`, label: "Action Log", icon: ListChecks }],
-        },
+        { label: "Work", items: [{ href: `/dashboard/${slug}/actions`, label: "Action Log", icon: ListChecks }] },
       ]
     : [];
 
-  const settings = [
+  const settings: Item[] = [
     { href: "/settings/connections", label: "Connections", icon: PlugZap },
     { href: "/settings/brands", label: "Brands", icon: Tags },
     { href: "/settings/sync", label: "Data Sync", icon: Database },
@@ -95,22 +91,26 @@ export function Sidebar({
 
   const nav = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-5 pt-5 pb-4">
-        <Link href="/dashboard">
-          <Logo />
+      <div className="relative px-5 pt-6 pb-5">
+        <Link href="/dashboard" aria-label="AmzCentric OS home" className="inline-block">
+          <Logo size="nav" />
         </Link>
-        <button className="lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
-          <X className="size-5 text-muted" strokeWidth={STROKE} />
+        <button
+          className="absolute top-5 right-2.5 rounded-lg p-1 text-muted hover:bg-surface lg:hidden"
+          onClick={() => setOpen(false)}
+          aria-label="Close menu"
+        >
+          <X className="size-5" strokeWidth={STROKE} />
         </button>
       </div>
 
-      <div className="px-3">
-        <label className="relative block">
-          <span className="sr-only">Brand</span>
+      <div className="px-4">
+        <label className="block">
+          <span className="mb-2 block px-3 text-[11px] font-bold tracking-[0.14em] text-faint uppercase">Brand</span>
           <select
             value={current?.slug ?? ""}
             onChange={(e) => router.push(e.target.value ? `/dashboard/${e.target.value}` : "/dashboard")}
-            className="w-full appearance-none rounded-xl border border-line bg-surface py-2.5 pr-9 pl-3 text-sm font-medium text-ink focus:border-brand focus:outline-none"
+            className={cn(selectClass, "font-semibold")}
           >
             <option value="">All brands</option>
             {brands.map((b) => (
@@ -120,41 +120,37 @@ export function Sidebar({
               </option>
             ))}
           </select>
-          <ChevronsUpDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-faint" strokeWidth={STROKE} />
         </label>
       </div>
 
-      <nav className="mt-4 flex-1 overflow-y-auto px-3 pb-4">
-        <NavItem href="/dashboard" label="All Brands" icon={BarChart3} active={pathname === "/dashboard"} />
+      <nav className="mt-5 flex-1 space-y-5 overflow-y-auto px-4 pb-6">
+        <div>
+          <NavItem href="/dashboard" label="All Brands" icon={BarChart3} active={pathname === "/dashboard"} />
+        </div>
         {groups.map((g) => (
-          <div key={g.label} className="mt-5">
-            <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">{g.label}</div>
+          <Section key={g.label} label={g.label}>
             {g.items.map((i) => (
               <NavItem key={i.href} {...i} active={isActive(i.href, i.exact)} />
             ))}
-          </div>
+          </Section>
         ))}
-        <div className="mt-5">
-          <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">Settings</div>
+        <Section label="Settings">
           {settings.map((i) => (
             <NavItem key={i.href} {...i} active={isActive(i.href)} />
           ))}
-        </div>
+        </Section>
       </nav>
 
-      <div className="border-t border-line px-4 py-3">
-        {demo && (
-          <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-accent-soft px-2.5 py-1.5 text-[11px] font-medium text-warn">
-            <Activity className="size-3.5" strokeWidth={STROKE} /> Demo data
-          </div>
-        )}
-        <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-xs text-muted" title={email}>
+      <div className="border-t border-line px-4 py-4">
+        {demo && <div className="mb-3 rounded-lg bg-gold-100 px-3 py-2 text-xs font-bold text-gold-800">Demo data: connect Supabase to go live</div>}
+        <div className="flex items-center gap-3 px-1">
+          <Avatar email={email} />
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink-2" title={email}>
             {email}
           </span>
           {!demo && (
             <form action={signOut}>
-              <button className="rounded-lg p-1.5 text-muted hover:bg-canvas hover:text-ink" aria-label="Sign out" title="Sign out">
+              <button className="rounded-lg p-1.5 text-muted hover:bg-surface hover:text-ink" aria-label="Sign out" title="Sign out">
                 <LogOut className="size-4" strokeWidth={STROKE} />
               </button>
             </form>
@@ -166,16 +162,16 @@ export function Sidebar({
 
   return (
     <>
-      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/90 px-4 py-3 backdrop-blur lg:hidden">
-        <Logo />
-        <button onClick={() => setOpen(true)} aria-label="Open menu" className="rounded-lg p-1.5 hover:bg-canvas">
+      <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line bg-surface/90 px-4 backdrop-blur lg:hidden">
+        <Logo size="sm" />
+        <button onClick={() => setOpen(true)} aria-label="Open menu" className="rounded-lg p-2 text-ink hover:bg-canvas">
           <Menu className="size-5" strokeWidth={STROKE} />
         </button>
       </div>
-      {open && <div className="fixed inset-0 z-40 bg-ink/30 lg:hidden" onClick={() => setOpen(false)} />}
+      {open && <div className="fixed inset-0 z-40 bg-navy-800/45 backdrop-blur-[4px] lg:hidden" onClick={() => setOpen(false)} />}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 border-r border-line bg-surface transition-transform lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-[248px] overflow-hidden border-r border-line bg-canvas transition-transform duration-200 lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -185,30 +181,27 @@ export function Sidebar({
   );
 }
 
-function NavItem({
-  href,
-  label,
-  icon: Icon,
-  active,
-  soon,
-}: {
-  href: string;
-  label: string;
-  icon: React.ElementType;
-  active: boolean;
-  soon?: string;
-}) {
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="px-3 pb-2 text-[11px] font-bold tracking-[0.14em] text-faint uppercase">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function NavItem({ href, label, icon: Icon, active, soon }: Item & { active: boolean }) {
   return (
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors",
-        active ? "bg-brand-soft font-medium text-brand-ink" : "text-ink-2 hover:bg-canvas hover:text-ink",
+        "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors",
+        active ? "bg-brand-soft text-brand-ink" : "text-muted hover:bg-surface hover:text-ink",
       )}
     >
-      <Icon className={cn("size-[18px]", active ? "text-brand" : "text-faint")} strokeWidth={STROKE} />
+      <Icon className="size-[18px] shrink-0" strokeWidth={STROKE} />
       <span className="flex-1">{label}</span>
-      {soon && <span className="rounded-md bg-canvas px-1.5 py-0.5 text-[10px] font-medium text-faint">{soon}</span>}
+      {soon && <span className="rounded-pill bg-surface px-2 py-0.5 text-[10px] font-bold text-faint ring-1 ring-line">{soon}</span>}
     </Link>
   );
 }

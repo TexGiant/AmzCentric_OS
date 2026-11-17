@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, TrendingDown, TrendingUp } from "lucide-react";
-import { Card, CardHeader, Kpi, PageHeader, Pill } from "@/components/ui";
+import { Card, CardHeader, IconChip, Kpi, PageHeader, Pill } from "@/components/ui";
 import { Legend, SalesSpendChart } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
@@ -89,7 +89,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
             key={c.label}
             label={c.label}
             highlight={c.live}
-            badge={c.live ? <span className="rounded bg-good-soft px-1.5 py-0.5 text-[10px] text-good">LIVE</span> : undefined}
+            badge={c.live ? <Pill tone="good" dot>Live</Pill> : undefined}
             value={money(c.now.sales)}
             sub={
               <>
@@ -118,7 +118,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
               />
             }
           />
-          <div className="px-3 pb-4">
+          <div className="px-3 pt-5 pb-4">
             <SalesSpendChart
               data={daily.slice(-30)}
               salesKey={hasTotal ? "totalSales" : "sales"}
@@ -132,22 +132,22 @@ export default async function BrandOverview({ params }: { params: BrandParams })
           <CardHeader title={`Attention required (${insights.filter((i) => i.tone !== "good").length})`} />
           <ul className="divide-y divide-line">
             {insights.length === 0 && (
-              <li className="flex items-center gap-3 px-5 py-4 text-sm text-muted">
+              <li className="flex items-center gap-3 px-6 py-5 text-sm text-muted">
                 <CheckCircle2 className="size-5 text-good" strokeWidth={1.5} /> Nothing unusual this week.
               </li>
             )}
             {insights.map((i, idx) => (
-              <li key={idx} className="flex items-start gap-3 px-5 py-3.5">
+              <li key={idx} className="flex items-center gap-3.5 px-6 py-4">
                 <InsightIcon insight={i} />
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-ink">{i.title}</div>
+                  <div className="text-sm font-bold text-ink">{i.title}</div>
                   <div className="truncate text-xs text-muted">{i.detail}</div>
                 </div>
               </li>
             ))}
           </ul>
-          <div className="border-t border-line px-5 py-3 text-xs">
-            <Link href={`/dashboard/${slug}/what-changed`} className="font-medium text-brand hover:underline">
+          <div className="border-t border-line px-6 py-3.5 text-sm">
+            <Link href={`/dashboard/${slug}/what-changed`} className="font-semibold text-brand-ink hover:underline">
               See what changed →
             </Link>
           </div>
@@ -158,7 +158,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
         <CardHeader
           title="Top campaigns · last 7 days"
           right={
-            <Link href={`/dashboard/${slug}/campaigns?range=7`} className="text-xs font-medium text-brand hover:underline">
+            <Link href={`/dashboard/${slug}/campaigns?range=7`} className="text-xs font-semibold text-brand-ink hover:underline">
               All campaigns →
             </Link>
           }
@@ -168,7 +168,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
           pageSize={8}
           columns={[
             { key: "name", label: "Campaign" },
-            { key: "adProduct", label: "Type", badge: { SP: "brand", SB: "warn", SD: "neutral" } },
+            { key: "adProduct", label: "Type", badge: { SP: "brand", SB: "info", SD: "neutral" } },
             { key: "cost", label: "Spend", format: "money" },
             { key: "sales", label: "Sales", format: "money" },
             { key: "acos", label: "ACOS", format: "pct" },
@@ -186,12 +186,11 @@ export default async function BrandOverview({ params }: { params: BrandParams })
 }
 
 function InsightIcon({ insight }: { insight: Insight }) {
-  const cls = "mt-0.5 size-8 shrink-0 rounded-lg p-1.5";
-  if (insight.tone === "good") return <TrendingUp className={`${cls} bg-good-soft text-good`} strokeWidth={1.5} />;
-  if (insight.kind === "acos") return <TrendingUp className={`${cls} bg-bad-soft text-bad`} strokeWidth={1.5} />;
-  if (insight.kind === "cvr") return <TrendingDown className={`${cls} bg-warn-soft text-warn`} strokeWidth={1.5} />;
-  if (insight.kind === "pace") return <Clock className={`${cls} bg-brand-soft text-brand`} strokeWidth={1.5} />;
-  return <AlertTriangle className={`${cls} bg-warn-soft text-warn`} strokeWidth={1.5} />;
+  if (insight.tone === "good") return <IconChip tone="good"><TrendingUp strokeWidth={1.5} /></IconChip>;
+  if (insight.kind === "acos") return <IconChip tone="bad"><TrendingUp strokeWidth={1.5} /></IconChip>;
+  if (insight.kind === "cvr") return <IconChip tone="warn"><TrendingDown strokeWidth={1.5} /></IconChip>;
+  if (insight.kind === "pace") return <IconChip><Clock strokeWidth={1.5} /></IconChip>;
+  return <IconChip tone="warn"><AlertTriangle strokeWidth={1.5} /></IconChip>;
 }
 
 function timeAgo(iso: string): string {

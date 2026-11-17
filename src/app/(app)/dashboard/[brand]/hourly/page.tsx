@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Card, CardHeader, Kpi, PageHeader, cn } from "@/components/ui";
+import { Card, CardHeader, Kpi, PageHeader, Segmented } from "@/components/ui";
 import { HourlyChart, Legend } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
@@ -36,20 +35,9 @@ export default async function HourlyPage({ params, searchParams }: { params: Bra
         title="Hourly"
         subtitle={`${brand.name} · hour-by-hour spend and sales in the marketplace's local time`}
         right={
-          <div className="flex flex-wrap gap-1">
-            {days.map((d) => (
-              <Link
-                key={d}
-                href={`/dashboard/${slug}/hourly?day=${d}`}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium",
-                  d === day ? "border-ink bg-ink text-white" : "border-line bg-surface text-muted hover:text-ink",
-                )}
-              >
-                {d === today ? "Today" : shortDate(d)}
-              </Link>
-            ))}
-          </div>
+          <Segmented
+            items={days.map((d) => ({ href: `/dashboard/${slug}/hourly?day=${d}`, label: d === today ? "Today" : shortDate(d), active: d === day }))}
+          />
         }
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -67,12 +55,12 @@ export default async function HourlyPage({ params, searchParams }: { params: Bra
               items={[
                 { label: "Sales", color: "var(--color-series-sales)" },
                 { label: "Spend", color: "var(--color-series-spend)" },
-                { label: "7-day avg sales", color: "#0f172a", dashed: true },
+                { label: "7-day avg sales", color: "#2d527e", dashed: true },
               ]}
             />
           }
         />
-        <div className="px-3 pb-4">
+        <div className="px-3 pt-5 pb-4">
           <HourlyChart data={hours.map((h) => ({ hour: h.hour, cost: h.cost, sales: h.sales, avgSales: avg(h.hour, "sales") }))} />
         </div>
       </Card>

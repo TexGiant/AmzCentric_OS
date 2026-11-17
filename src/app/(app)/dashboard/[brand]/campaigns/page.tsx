@@ -32,13 +32,13 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
         right={<RangeTabs basePath={base} current={range.days} extra={{ type }} />}
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-        <Kpi label="Spend" value={money(t.cost)} delta={change(t.cost, tp.cost)} invert />
-        <Kpi label="Sales" value={money(t.sales)} delta={change(t.sales, tp.sales)} />
-        <Kpi label="ACOS" value={pct(acos(t))} delta={change(acos(t), acos(tp))} invert />
-        <Kpi label="ROAS" value={roas(t)?.toFixed(2) ?? "—"} delta={change(roas(t), roas(tp))} />
-        <Kpi label="CPC" value={money(cpc(t), 2)} delta={change(cpc(t), cpc(tp))} invert />
-        <Kpi label="CTR" value={pct(ctr(t), 2)} delta={change(ctr(t), ctr(tp))} />
-        <Kpi label="CVR" value={pct(cvr(t))} delta={change(cvr(t), cvr(tp))} />
+        <Kpi size="sm" label="Spend" value={money(t.cost)} delta={change(t.cost, tp.cost)} invert />
+        <Kpi size="sm" label="Sales" value={money(t.sales)} delta={change(t.sales, tp.sales)} />
+        <Kpi size="sm" label="ACOS" value={pct(acos(t))} delta={change(acos(t), acos(tp))} invert />
+        <Kpi size="sm" label="ROAS" value={roas(t)?.toFixed(2) ?? "—"} delta={change(roas(t), roas(tp))} />
+        <Kpi size="sm" label="CPC" value={money(cpc(t), 2)} delta={change(cpc(t), cpc(tp))} invert />
+        <Kpi size="sm" label="CTR" value={pct(ctr(t), 2)} delta={change(ctr(t), ctr(tp))} />
+        <Kpi size="sm" label="CVR" value={pct(cvr(t))} delta={change(cvr(t), cvr(tp))} />
       </div>
       <Card className="mt-6">
         <Tabs
@@ -55,7 +55,7 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
           defaultSort={{ key: "cost", dir: "desc" }}
           columns={[
             { key: "name", label: "Campaign", width: "30%" },
-            { key: "adProduct", label: "Type", badge: { SP: "brand", SB: "warn", SD: "neutral" } },
+            { key: "adProduct", label: "Type", badge: { SP: "brand", SB: "info", SD: "neutral" } },
             { key: "state", label: "State", badge: { enabled: "good", paused: "neutral", archived: "neutral" } },
             { key: "budget", label: "Budget", format: "money" },
             { key: "impressions", label: "Impr.", format: "int" },

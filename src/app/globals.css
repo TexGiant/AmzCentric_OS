@@ -1,44 +1,159 @@
 @import "tailwindcss";
 
+/*
+ * AmzCentric design tokens (from amzcentric.css v1.0).
+ * White carries the page. Navy for ink. Amber marks the action.
+ * Montserrat for headings and figures, Manrope for everything else.
+ */
 @theme {
-  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-montserrat), var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 
-  --color-ink: #0f172a;
-  --color-ink-2: #334155;
-  --color-muted: #64748b;
-  --color-faint: #94a3b8;
-  --color-line: #e5e7ef;
-  --color-canvas: #f6f7fb;
+  /* Navy */
+  --color-navy-900: #000814;
+  --color-navy-800: #000f22;
+  --color-navy-750: #04121f;
+  --color-navy-700: #081a2e;
+  --color-navy-650: #0c2236;
+  --color-navy-600: #103050;
+  --color-navy-500: #1c3b5c;
+  --color-navy-400: #2d527e;
+  --color-navy-300: #7c93b3;
+
+  /* Gold / amber */
+  --color-gold-800: #b06a0c;
+  --color-gold-700: #d4830f;
+  --color-gold-600: #f29804;
+  --color-gold-500: #f8a42e;
+  --color-gold-400: #fbb256;
+  --color-gold-300: #fdc880;
+  --color-gold-200: #fde2b8;
+  --color-gold-100: #fef4e3;
+
+  /* Semantic (light) — names used across the app */
+  --color-ink: #000f22; /* fg-strong */
+  --color-ink-2: #334155; /* fg-body */
+  --color-muted: #64748b; /* fg-muted */
+  --color-faint: #94a3b8; /* fg-faint */
+  --color-line: rgb(0 15 34 / 0.12); /* border-subtle */
+  --color-line-strong: rgb(0 15 34 / 0.28); /* border-default */
+  --color-canvas: #f8fafc; /* bg-sunken / nav */
   --color-surface: #ffffff;
 
-  --color-brand: #2447d6;
-  --color-brand-ink: #172e8f;
-  --color-brand-soft: #edf1ff;
-  --color-accent: #ff9f1c;
-  --color-accent-soft: #fff4e5;
+  --color-brand: #f8a42e; /* amber: fills, active states, bars */
+  --color-brand-hover: #f29804;
+  --color-brand-ink: #d4830f; /* amber text on white */
+  --color-brand-soft: #fef4e3;
 
-  --color-good: #0f9f61;
-  --color-good-soft: #e7f7ef;
-  --color-bad: #e5383b;
-  --color-bad-soft: #fdecec;
+  --color-good: #16a34a;
+  --color-good-ink: #166534;
+  --color-good-soft: #dcfce7;
+  --color-bad: #dc2626;
+  --color-bad-ink: #991b1b;
+  --color-bad-soft: #fee2e2;
   --color-warn: #d97706;
-  --color-warn-soft: #fef5e7;
+  --color-warn-ink: #92400e;
+  --color-warn-soft: #fef3c7;
+  --color-info: #2563eb;
+  --color-info-ink: #1e40af;
+  --color-info-soft: #dbeafe;
 
-  --color-series-sales: #2447d6;
-  --color-series-spend: #ff9f1c;
-  --color-series-3: #0ea5a4;
-  --color-series-4: #a78bfa;
+  /* Charts: navy for sales, amber for spend */
+  --color-series-sales: #000f22;
+  --color-series-spend: #f8a42e;
+  --color-series-3: #2d527e;
+  --color-series-4: #94a3b8;
+
+  --radius-pill: 999px;
+
+  --shadow-card: 0 2px 6px rgb(0 15 34 / 0.07);
+  --shadow-raised: 0 8px 24px rgb(0 15 34 / 0.1);
+  --shadow-overlay: 0 20px 48px rgb(0 15 34 / 0.16);
+  --shadow-gold: 0 14px 34px rgb(248 164 46 / 0.28);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  --hero-gradient: linear-gradient(180deg, #ffffff 0%, #fdeeda 46%, #fbb55a 100%);
+  --accent-gradient: linear-gradient(160deg, #fbb558 0%, #f8a42e 60%, #f29804 100%);
+  --ring: 0 0 0 3px rgb(248 164 46 / 0.45);
 }
 
 html {
-  font-feature-settings: "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--color-canvas);
+  background: #ffffff;
+  color: var(--color-ink-2);
+}
+
+h1,
+h2,
+h3 {
   color: var(--color-ink);
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+::selection {
+  background: var(--color-gold-500);
+  color: var(--color-navy-900);
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Brand checkbox (.amz-check) */
+.amz-check {
+  appearance: none;
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: inline-grid;
+  place-content: center;
+  border: 1.5px solid rgb(0 15 34 / 0.48);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 130ms;
+}
+.amz-check:checked {
+  background: var(--color-gold-500);
+  border-color: var(--color-gold-500);
+}
+.amz-check:checked::after {
+  content: "";
+  width: 10px;
+  height: 6px;
+  border: 2px solid var(--color-navy-900);
+  border-top: 0;
+  border-right: 0;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+/* Brand select chevron (.amz-select) */
+select.amz-select {
+  appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238da0b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
 }

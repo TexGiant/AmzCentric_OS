@@ -18,8 +18,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         demo={isDemoMode()}
         signOut={signOut}
       />
-      <main className="lg:pl-64">
-        <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-8 sm:py-8">{children}</div>
+      <main className="lg:pl-[248px]">
+        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-8 sm:py-8">{children}</div>
       </main>
     </div>
   );

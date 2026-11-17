@@ -19,7 +19,7 @@ The app runs on **demo data** until Supabase is configured, so you can click thr
 | Component | Choice | Notes |
 |---|---|---|
 | Framework | Next.js 16 (App Router) | `src/` dir, auth proxy at `src/proxy.ts` |
-| UI | React 19, Tailwind CSS 4, Recharts, Lucide | Theme tokens in `src/app/globals.css`, DM Sans |
+| UI | React 19, Tailwind CSS 4, Recharts, Lucide | AmzCentric CSS v1.0 tokens in `src/app/globals.css`; components in `src/components/ui.tsx`; Manrope + Montserrat |
 | DB + Auth | Supabase | Schema: `supabase/migrations/0001_init.sql` |
 | Hosting | Vercel | Crons in `vercel.json` |
 | DNS | GoDaddy | Subdomain CNAME to Vercel (your Hostinger site is untouched) |
@@ -112,6 +112,15 @@ You already receive Stream data into SQS. The app needs to read from those queue
 2. **Settings → Connections** → *Connect NA* (and EU/FE if needed) → approve with the Amazon login that has your advertising accounts.
 3. Enable the profiles you manage and assign each one to a brand.
 4. **Settings → Data Sync** → request a 60–95 day backfill → click *Check reports* after a few minutes (Amazon takes about 1–20 minutes per report). After that, the crons keep data current.
+
+## Brand & design system
+
+The UI follows **AmzCentric CSS v1.0**: white pages, navy `#000F22` ink, amber `#F8A42E` as the one action color, Montserrat for headings and figures, Manrope for everything else.
+
+- Tokens: `src/app/globals.css` (`navy-*`, `gold-*`, semantic `ink`, `muted`, `line`, `brand`, status colors, shadows, `--hero-gradient`)
+- Components: `src/components/ui.tsx` mirrors the `.amz-*` classes: `Card`, `CardHeader`, `Kpi` (stat with amber bar), `Eyebrow` (`[ LABEL ]`), `Pill` (badge), `Delta` (▲/▼), `Segmented`, `Tabs`, `Alert`, `Progress`, `Avatar`, `IconChip`, `NavyPanel`, `buttonClass.*`, `inputClass` / `selectClass`
+- Logo: `public/brand/amzcentric-logo.png` (light surfaces). Favicon and Apple icon are cut from the "A" mark (`src/app/icon.png`, `src/app/apple-icon.png`)
+- Charts: navy = sales, amber = spend, amber dashed lines = logged actions
 
 ## Environment variables
 
