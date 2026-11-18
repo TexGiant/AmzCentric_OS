@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Loader2, Play, RefreshCw, Radio } from "lucide-react";
 import { createBrand, inviteMember } from "@/app/settings-actions";
@@ -153,4 +154,15 @@ function summarize(json: Record<string, unknown>): string {
     .filter(([, v]) => !(Array.isArray(v) && v.length === 0))
     .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.slice(0, 5).join("\n  ") : String(v)}`)
     .join("\n");
+}
+
+/** Submit button that shows a spinner while its form's server action runs. */
+export function PendingButton({ children, pendingText, className }: { children: React.ReactNode; pendingText: string; className?: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button className={className} disabled={pending}>
+      {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+      {pending ? pendingText : children}
+    </button>
+  );
 }

@@ -221,3 +221,25 @@ export async function ingestStream(deadline: number): Promise<IngestResult> {
   );
   return out;
 }
+
+/** https://sqs.us-east-1.amazonaws.com/123456789012/name → arn:aws:sqs:us-east-1:123456789012:name */
+export function queueArn(url: string): string | null {
+  const m = url.match(/^https:\/\/sqs[.-]([a-z0-9-]+)\.amazonaws\.com\/(\d{12})\/([A-Za-z0-9_.-]+)\/?$/);
+  return m ? `arn:aws:sqs:${m[1]}:${m[2]}:${m[3]}` : null;
+}
+
+/**
+ * Which configured queue receives which dataset. A queue is matched by name
+ * (e.g. ".../sp-traffic" → sp-traffic), so name queues after their dataset.
+ */
+export function streamDestinations(): Record<"sp-traffic" | "sp-conversion", string | null> {
+  const urls = (process.env.STREAM_SQS_QUEUE_URLS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const find = (dataset: string) => {
+    const url = urls.find((u) => (u.split("/").pop() ?? "").toLowerCase().includes(dataset));
+    return url ? queueArn(url) : null;
+  };
+  return { "sp-traffic": find("sp-traffic"), "sp-conversion": find("sp-conversion") };
+}

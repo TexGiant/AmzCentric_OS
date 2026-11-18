@@ -1,6 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import type { AdsAccount } from "@/lib/amazon/ads";
+import { AdsApiError } from "@/lib/amazon/ads";
+import { createStreamSubscription, isLive, listStreamSubscriptions, STREAM_DATASETS } from "@/lib/amazon/stream";
+import { ingestStream, streamDestinations } from "@/lib/stream/sqs";
 import { requireAdmin, requireUser } from "@/lib/auth";
 import { isAllowedEmail, isDemoMode, siteUrl } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -114,4 +119,46 @@ export async function removeMember(form: FormData) {
   if (id === me.id) return;
   await createAdminClient().auth.admin.deleteUser(id);
   revalidatePath("/settings/team");
+}
+
+// ── Marketing Stream subscriptions ───────────────────────────────────
+/** Create any missing sp-traffic / sp-conversion subscriptions for one profile, then confirm them. */
+export async function subscribeStream(form: FormData) {
+  await requireUser();
+  if (isDemoMode()) redirect("/settings/connections?error=demo");
+  const profileId = String(form.get("profile_id") ?? "");
+  const back = (params: Record<string, string>) => redirect(`/settings/connections?${new URLSearchParams(params)}#stream`);
+
+  const destinations = streamDestinations();
+  const { data: row } = await createAdminClient()
+    .from("amazon_profiles")
+    .select("profile_id, account_name, account:amazon_accounts(id, region, refresh_token)")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (!row) back({ stream_error: "Profile not found" });
+  const account = (Array.isArray(row!.account) ? row!.account[0] : row!.account) as AdsAccount;
+  const name = row!.account_name ?? profileId;
+
+  let created = 0;
+  try {
+    const existing = await listStreamSubscriptions(account, profileId);
+    for (const dataset of STREAM_DATASETS) {
+      const arn = destinations[dataset];
+      if (!arn) continue;
+      if (existing.some((s) => s.dataSetId === dataset && s.destinationArn === arn && isLive(s))) continue;
+      await createStreamSubscription(account, profileId, dataset, arn);
+      created++;
+    }
+  } catch (err) {
+    const msg = err instanceof AdsApiError ? `${err.message}: ${err.body.slice(0, 300)}` : String(err);
+    back({ stream_error: `${name}: ${msg}` });
+  }
+
+  // Amazon sends an SNS confirmation message to each queue; reading the queue confirms it.
+  if (created > 0) {
+    await new Promise((r) => setTimeout(r, 6000));
+    await ingestStream(Date.now() + 25_000).catch(() => undefined);
+  }
+  revalidatePath("/settings/connections");
+  back({ stream_ok: created > 0 ? `${name}: created ${created} subscription(s)` : `${name}: already subscribed` });
 }

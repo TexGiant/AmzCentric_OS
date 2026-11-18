@@ -1,8 +1,11 @@
-import { PlugZap } from "lucide-react";
+import { Suspense } from "react";
+import { PlugZap, Radio } from "lucide-react";
 import { Alert, Card, CardHeader, Empty, PageHeader, Pill, buttonClass, cn, inputClass, selectClass } from "@/components/ui";
 import { disconnectAccount, renameAccount, updateProfile } from "@/app/settings-actions";
 import { requireUser } from "@/lib/auth";
-import { REGIONS, type Region } from "@/lib/amazon/ads";
+import { REGIONS, type AdsAccount, type Region } from "@/lib/amazon/ads";
+import { StreamStatusCells } from "@/components/stream-status";
+import { streamDestinations } from "@/lib/stream/sqs";
 import { data } from "@/lib/data";
 import { isDemoMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -17,7 +20,10 @@ type ProfileRow = {
   brand_slug: string | null;
   enabled: boolean;
 };
-type AccountRow = { id: string; name: string; region: Region; created_at: string; last_error: string | null; amazon_profiles: ProfileRow[] };
+type AccountRow = { id: string; name: string; region: Region; refresh_token: string; created_at: string; last_error: string | null; amazon_profiles: ProfileRow[] };
+
+// Subscribing waits for Amazon's confirmation message, so give the action time.
+export const maxDuration = 60;
 
 export default async function ConnectionsPage({ searchParams }: { searchParams: SearchParams }) {
   const user = await requireUser();
@@ -29,13 +35,21 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   if (!demo) {
     const { data: rows, error } = await createAdminClient()
       .from("amazon_accounts")
-      .select("id, name, region, created_at, last_error, amazon_profiles(profile_id, country_code, account_name, account_type, display_name, brand_slug, enabled)")
+      .select("id, name, region, refresh_token, created_at, last_error, amazon_profiles(profile_id, country_code, account_name, account_type, display_name, brand_slug, enabled)")
       .order("created_at");
     if (error) throw error;
     accounts = (rows ?? []) as AccountRow[];
   }
   const error = param(sp, "error");
   const connected = param(sp, "connected");
+  const streamOk = param(sp, "stream_ok");
+  const streamError = param(sp, "stream_error");
+  const destinations = streamDestinations();
+  const enabledProfiles = accounts.flatMap((a) =>
+    a.amazon_profiles
+      .filter((p) => p.enabled)
+      .map((p) => ({ ...p, account: { id: a.id, region: a.region, refresh_token: a.refresh_token } satisfies AdsAccount })),
+  );
 
   return (
     <>
@@ -57,6 +71,17 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
       {connected && (
         <Alert tone="good" title="Amazon account connected">
           Imported {connected} advertising profile(s). Enable the ones you manage and assign them to brands.
+        </Alert>
+      )}
+
+      {streamOk && (
+        <Alert tone="good" title="Marketing Stream">
+          {streamOk}. Hourly data starts arriving within about an hour.
+        </Alert>
+      )}
+      {streamError && (
+        <Alert tone="bad" title="Marketing Stream subscription failed">
+          {streamError}
         </Alert>
       )}
 
@@ -147,6 +172,62 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
           );
         })}
       </div>
+
+      {enabledProfiles.length > 0 && (
+        <Card className="mt-4">
+          <div id="stream" className="scroll-mt-6" />
+          <CardHeader
+            title="Marketing Stream (hourly data)"
+            sub="Each enabled profile needs its own sp-traffic and sp-conversion subscription to send hourly data to your SQS queues."
+          />
+          <div className="flex flex-wrap gap-x-6 gap-y-1 border-b border-line px-6 py-3 text-xs text-muted">
+            {(["sp-traffic", "sp-conversion"] as const).map((d) => (
+              <span key={d}>
+                <span className="font-semibold text-ink-2">{d}</span> →{" "}
+                {destinations[d] ? (
+                  <code className="text-ink-2">{destinations[d]}</code>
+                ) : (
+                  <span className="font-semibold text-bad">no queue in STREAM_SQS_QUEUE_URLS (queue name must contain &quot;{d}&quot;)</span>
+                )}
+              </span>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b border-line bg-canvas text-left text-[11px] font-bold tracking-[0.14em] text-muted uppercase">
+                  <th className="py-3 pr-4 pl-6">Profile</th>
+                  <th className="px-4">sp-traffic</th>
+                  <th className="px-4">sp-conversion</th>
+                  <th className="pr-6" />
+                </tr>
+              </thead>
+              <tbody>
+                {enabledProfiles.map((p) => (
+                  <tr key={p.profile_id} className="border-b border-line last:border-0">
+                    <td className="py-3 pr-4 pl-6">
+                      <div className="font-semibold text-ink">
+                        {p.display_name || p.account_name || p.profile_id} <span className="text-faint">· {p.country_code}</span>
+                      </div>
+                      <div className="text-xs text-faint">{p.profile_id}</div>
+                    </td>
+                    <Suspense
+                      fallback={
+                        <td className="px-4 py-3 text-xs text-muted" colSpan={3}>
+                          <Radio className="mr-1.5 inline size-3.5 animate-pulse" strokeWidth={1.5} />
+                          Checking with Amazon…
+                        </td>
+                      }
+                    >
+                      <StreamStatusCells account={p.account} profileId={p.profile_id} destinations={destinations} />
+                    </Suspense>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </>
   );
 }
