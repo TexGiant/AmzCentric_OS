@@ -1,4 +1,4 @@
-export function money(v: number | null | undefined, digits = 0): string {
+export function money(v: number | null | undefined, digits = 2): string {
   if (v == null || !Number.isFinite(v)) return "—";
   return v.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
@@ -18,7 +18,7 @@ export function compact(v: number | null | undefined): string {
   return Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
 }
 
-export type FormatKind = "money" | "money2" | "pct" | "int" | "text" | "delta" | "ratio";
+export type FormatKind = "money" | "money2" | "pct" | "int" | "text" | "delta" | "ratio" | "dec1";
 
 export function formatValue(kind: FormatKind, v: unknown): string {
   if (kind === "text") return v == null || v === "" ? "—" : String(v);
@@ -32,6 +32,8 @@ export function formatValue(kind: FormatKind, v: unknown): string {
       return pct(n);
     case "delta":
       return n == null || !Number.isFinite(n) ? "—" : `${n > 0 ? "+" : ""}${(n * 100).toFixed(1)}%`;
+    case "dec1":
+      return n == null || !Number.isFinite(n) ? "—" : n.toFixed(1);
     case "ratio":
       return n == null || !Number.isFinite(n) ? "—" : `${n.toFixed(2)}x`;
     default:

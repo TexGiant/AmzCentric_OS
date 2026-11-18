@@ -79,6 +79,8 @@ In your Login with Amazon security profile (the one tied to your Ads API access)
 
 ### 3. Marketing Stream (SQS)
 
+**Shortcut:** in AWS CloudShell (N. Virginia), run `bash scripts/aws/setup-stream-queues.sh <STREAM_AWS_ACCESS_KEY_ID>`. It creates any missing `sp-/sb-/sd-` traffic and conversion queues with Amazon's required access policy, grants the app's IAM user read access, and prints the `STREAM_SQS_QUEUE_URLS` value. The manual steps below do the same thing.
+
 You already receive Stream data into SQS. The app needs to read from those queues:
 
 1. In AWS IAM, create a user (or access key) with this policy on your Stream queue(s):

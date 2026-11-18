@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Tags } from "lucide-react";
-import { Card, CardHeader, Delta, Empty, Eyebrow, NavyPanel, NavyStat, PageHeader, RangeTabs, buttonClass } from "@/components/ui";
+import { Card, CardHeader, Delta, Empty, Eyebrow, Figure, NavyPanel, NavyStat, PageHeader, RangeTabs, buttonClass } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
 import { resolveRange } from "@/lib/dates";
@@ -118,7 +118,9 @@ function Mini({ label, value, delta, invert }: { label: string; value: string; d
   return (
     <div>
       <div className="text-xs font-semibold text-muted">{label}</div>
-      <div className="mt-1 font-display text-[18px] font-bold text-ink tabular">{value}</div>
+      <div className="mt-1 font-display text-[18px] font-bold text-ink tabular">
+        <Figure value={value} />
+      </div>
       <Delta value={delta} invert={invert} />
     </div>
   );

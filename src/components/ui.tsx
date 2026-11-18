@@ -130,6 +130,18 @@ export function Delta({ value, invert = false, className }: { value: number | nu
 
 // ── KPI / stat ─────────────────────────────────────────────────────────
 
+/** "$525,937.42" → big "$525,937" + small ".42" so figures with cents stay compact. */
+export function Figure({ value }: { value: string }) {
+  const m = value.match(/^(-?\$[\d,]+)(\.\d+)$/);
+  if (!m) return <>{value}</>;
+  return (
+    <>
+      {m[1]}
+      <span className="text-[0.62em] tracking-normal">{m[2]}</span>
+    </>
+  );
+}
+
 /** .amz-stat inside a card: label, Montserrat figure, amber bar, meta row. */
 export function Kpi({
   label,
@@ -166,7 +178,7 @@ export function Kpi({
             size === "sm" ? "text-[22px]" : "text-[28px]",
           )}
         >
-          {value}
+          <Figure value={value} />
         </span>
         {unit && <span className="text-xs font-semibold text-muted">{unit}</span>}
       </div>
@@ -187,7 +199,9 @@ export function NavyStat({ label, value, delta, invert }: { label: string; value
   return (
     <div>
       <div className="text-sm font-semibold text-[#8da0b8]">{label}</div>
-      <div className="mt-2 font-display text-[28px] leading-none font-bold tracking-[-0.01em] text-white tabular">{value}</div>
+      <div className="mt-2 font-display text-[28px] leading-none font-bold tracking-[-0.01em] text-white tabular">
+        <Figure value={value} />
+      </div>
       <div className="mt-3 h-[3px] w-10 rounded-full bg-brand" />
       {delta !== undefined && (
         <div className="mt-2 flex items-center gap-2 text-xs text-[#8da0b8]">

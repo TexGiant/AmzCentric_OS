@@ -205,3 +205,30 @@ export function PaceChart({ data }: { data: Array<{ date: string; actual: number
     </div>
   );
 }
+
+/** Clicks by hour (bars) with orders (line, right axis) and the trailing 7-day average clicks. */
+export function HourlyClicksChart({ data }: { data: Array<{ hour: number; clicks: number; orders: number; avgClicks: number }> }) {
+  const hourLabel = (h: number | string) => {
+    const n = Number(h);
+    return n === 0 ? "12a" : n < 12 ? `${n}a` : n === 12 ? "12p" : `${n - 12}p`;
+  };
+  return (
+    <div className="h-64 w-full">
+      <ResponsiveContainer>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke={GRID} />
+          <XAxis dataKey="hour" tickFormatter={hourLabel} tick={AXIS} axisLine={false} tickLine={false} interval={1} />
+          <YAxis yAxisId="c" allowDecimals={false} tick={AXIS} axisLine={false} tickLine={false} width={36} />
+          <YAxis yAxisId="o" orientation="right" allowDecimals={false} tick={AXIS} axisLine={false} tickLine={false} width={28} />
+          <Tooltip
+            cursor={CURSOR}
+            content={<ChartTooltip labelFormat={(l) => hourLabel(l)} valueFormat={(k, v) => (k === "avgClicks" ? v.toFixed(1) : String(Math.round(v)))} />}
+          />
+          <Bar yAxisId="c" dataKey="clicks" name="Clicks" fill="#2d527e" radius={[4, 4, 0, 0]} maxBarSize={16} />
+          <Line yAxisId="c" dataKey="avgClicks" name="7-day avg clicks" stroke="#94a3b8" strokeDasharray="4 3" strokeWidth={1.5} dot={false} type="monotone" />
+          <Line yAxisId="o" dataKey="orders" name="Orders" stroke={GOLD} strokeWidth={2.25} dot={{ r: 2.5, fill: GOLD }} type="monotone" />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

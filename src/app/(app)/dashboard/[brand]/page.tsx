@@ -5,7 +5,7 @@ import { Legend, SalesSpendChart } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
 import { addDays, daysInMonth, hourInTz, monthStart, shortDate, todayInTz } from "@/lib/dates";
-import { money, pct } from "@/lib/format";
+import { int, money, pct } from "@/lib/format";
 import { acos, change, sum, tacos, type Totals } from "@/lib/metrics";
 import { attentionItems, type Insight } from "@/lib/insights";
 import { getBrandOr404, type BrandParams } from "@/lib/page";
@@ -95,7 +95,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
             unit="ad sales"
             sub={
               <>
-                Spend {money(c.now.cost)} · ACOS {pct(acos(c.now))}
+                Spend {money(c.now.cost)} · {int(c.now.clicks)} clicks · ACOS {pct(acos(c.now))}
                 {!c.live && hasTotal && <> · TACOS {pct(tacos(c.now))}</>}
               </>
             }
