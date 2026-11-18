@@ -58,7 +58,7 @@ export const supabaseSource: DataSource = {
     const [{ count }, through, campaigns] = await Promise.all([
       db.from("amazon_profiles").select("profile_id", { count: "exact", head: true }).eq("brand_slug", brand).eq("enabled", true),
       db.rpc("brand_data_through", { p_brand: brand }),
-      db.from("amazon_profiles").select("profile_id, campaigns(campaign_id)").eq("brand_slug", brand).eq("enabled", true),
+      db.from("amazon_profiles").select("profile_id, timezone, campaigns(campaign_id)").eq("brand_slug", brand).eq("enabled", true),
     ]);
     const ids = (campaigns.data ?? []).flatMap((p) => ((p.campaigns ?? []) as { campaign_id: string }[]).map((c) => c.campaign_id));
     let streamLastHour: string | null = null;
@@ -76,6 +76,7 @@ export const supabaseSource: DataSource = {
       dataThrough: (through.data as string | null) ?? null,
       streamLastHour,
       spApiConnected: false,
+      timezone: (campaigns.data?.[0]?.timezone as string) ?? "America/Los_Angeles",
     };
   },
 

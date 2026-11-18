@@ -54,6 +54,8 @@ export type BrandStatus = {
   dataThrough: string | null;
   streamLastHour: string | null;
   spApiConnected: boolean;
+  /** Marketplace timezone of the brand's profiles — "today" means today there. */
+  timezone: string;
 };
 
 export interface DataSource {

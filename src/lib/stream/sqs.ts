@@ -1,6 +1,7 @@
 import "server-only";
 import { DeleteMessageBatchCommand, ReceiveMessageCommand, SQSClient, type Message } from "@aws-sdk/client-sqs";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { STREAM_DATASETS, type StreamDataset } from "@/lib/amazon/stream";
 
 /**
  * Amazon Marketing Stream → SQS → Supabase.
@@ -232,7 +233,7 @@ export function queueArn(url: string): string | null {
  * Which configured queue receives which dataset. A queue is matched by name
  * (e.g. ".../sp-traffic" → sp-traffic), so name queues after their dataset.
  */
-export function streamDestinations(): Record<"sp-traffic" | "sp-conversion", string | null> {
+export function streamDestinations(): Record<StreamDataset, string | null> {
   const urls = (process.env.STREAM_SQS_QUEUE_URLS ?? "")
     .split(",")
     .map((s) => s.trim())
@@ -241,5 +242,5 @@ export function streamDestinations(): Record<"sp-traffic" | "sp-conversion", str
     const url = urls.find((u) => (u.split("/").pop() ?? "").toLowerCase().includes(dataset));
     return url ? queueArn(url) : null;
   };
-  return { "sp-traffic": find("sp-traffic"), "sp-conversion": find("sp-conversion") };
+  return Object.fromEntries(STREAM_DATASETS.map((d) => [d, find(d)])) as Record<StreamDataset, string | null>;
 }

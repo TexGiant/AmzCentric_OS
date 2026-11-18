@@ -4,7 +4,7 @@ import { Card, CardHeader, IconChip, Kpi, PageHeader, Pill } from "@/components/
 import { Legend, SalesSpendChart } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
-import { addDays, daysInMonth, monthStart, shortDate, todayUtc } from "@/lib/dates";
+import { addDays, daysInMonth, hourInTz, monthStart, shortDate, todayInTz } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
 import { acos, change, sum, tacos, type Totals } from "@/lib/metrics";
 import { attentionItems, type Insight } from "@/lib/insights";
@@ -15,14 +15,15 @@ export default async function BrandOverview({ params }: { params: BrandParams })
   const brand = await getBrandOr404(slug);
   const ds = data();
 
-  const today = todayUtc();
+  // "Today" is today in the marketplace's timezone (Amazon Ads console uses the same).
+  const status = await ds.brandStatus(slug);
+  const today = todayInTz(status.timezone);
   const to = addDays(today, -1);
   const from = addDays(to, -59);
   const month = monthStart(to);
 
-  const [daily, status, hourlyToday, hourlyYesterday, campaignsNow, campaignsPrev, goal, actions] = await Promise.all([
+  const [daily, hourlyToday, hourlyYesterday, campaignsNow, campaignsPrev, goal, actions] = await Promise.all([
     ds.brandDaily(slug, from, to),
-    ds.brandStatus(slug),
     ds.hourly(slug, today),
     ds.hourly(slug, to),
     ds.campaigns(slug, addDays(to, -6), to),
@@ -32,7 +33,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
   ]);
 
   const win = (days: number, offset = 0) => sum(daily.slice(daily.length - days - offset, daily.length - offset));
-  const nowHour = new Date().getUTCHours();
+  const nowHour = hourInTz(status.timezone);
   const live = sum(hourlyToday.map((h) => ({ ...h, units: 0 })));
   const liveCompare = sum(hourlyYesterday.filter((h) => h.hour <= nowHour).map((h) => ({ ...h, units: 0 })));
 
@@ -91,6 +92,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
             highlight={c.live}
             badge={c.live ? <Pill tone="good" dot>Live</Pill> : undefined}
             value={money(c.now.sales)}
+            unit="ad sales"
             sub={
               <>
                 Spend {money(c.now.cost)} · ACOS {pct(acos(c.now))}
@@ -102,7 +104,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
         ))}
       </div>
       <p className="mt-2 text-xs text-faint">
-        Big number = ad-attributed sales. &ldquo;Today&rdquo; is hourly Marketing Stream data compared with yesterday at the same hour.
+        &ldquo;Today&rdquo; is live hourly Marketing Stream data in the marketplace&apos;s timezone, compared with yesterday at the same hour.
       </p>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-3">

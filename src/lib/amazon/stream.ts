@@ -13,7 +13,7 @@ const MEDIA_TYPES = [
   "application/vnd.MarketingStreamSubscriptions.StreamSubscriptionResource.v1.0+json",
 ];
 
-export const STREAM_DATASETS = ["sp-traffic", "sp-conversion"] as const;
+export const STREAM_DATASETS = ["sp-traffic", "sp-conversion", "sb-traffic", "sb-conversion", "sd-traffic", "sd-conversion"] as const;
 export type StreamDataset = (typeof STREAM_DATASETS)[number];
 
 export type StreamSubscription = {

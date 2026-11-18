@@ -140,9 +140,12 @@ export function Kpi({
   badge,
   highlight,
   size = "md",
+  unit,
 }: {
   label: string;
   value: string;
+  /** Small caption after the figure, e.g. "ad sales". */
+  unit?: string;
   sub?: React.ReactNode;
   delta?: number | null;
   invert?: boolean;
@@ -156,13 +159,16 @@ export function Kpi({
         {label}
         {badge}
       </div>
-      <div
-        className={cn(
-          "mt-2.5 font-display leading-none font-bold tracking-[-0.01em] text-ink tabular",
-          size === "sm" ? "text-[22px]" : "text-[28px]",
-        )}
-      >
-        {value}
+      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-1.5">
+        <span
+          className={cn(
+            "font-display leading-none font-bold tracking-[-0.01em] text-ink tabular",
+            size === "sm" ? "text-[22px]" : "text-[28px]",
+          )}
+        >
+          {value}
+        </span>
+        {unit && <span className="text-xs font-semibold text-muted">{unit}</span>}
       </div>
       <div className="mt-3 h-[3px] w-10 rounded-full bg-brand" />
       {sub && <div className="mt-2.5 text-xs leading-relaxed text-muted tabular">{sub}</div>}

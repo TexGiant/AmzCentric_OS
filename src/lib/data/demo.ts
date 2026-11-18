@@ -176,6 +176,7 @@ export const demoSource: DataSource = {
       dataThrough: addDays(todayUtc(), -1),
       streamLastHour: new Date(Date.now() - 3600_000).toISOString(),
       spApiConnected: true,
+      timezone: "UTC",
     };
   },
 

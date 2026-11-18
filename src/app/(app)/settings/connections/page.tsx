@@ -4,7 +4,7 @@ import { Alert, Card, CardHeader, Empty, PageHeader, Pill, buttonClass, cn, inpu
 import { disconnectAccount, renameAccount, updateProfile } from "@/app/settings-actions";
 import { requireUser } from "@/lib/auth";
 import { REGIONS, type AdsAccount, type Region } from "@/lib/amazon/ads";
-import { StreamStatusCells } from "@/components/stream-status";
+import { AD_TYPES, StreamStatusCells } from "@/components/stream-status";
 import { streamDestinations } from "@/lib/stream/sqs";
 import { data } from "@/lib/data";
 import { isDemoMode } from "@/lib/env";
@@ -178,17 +178,13 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
           <div id="stream" className="scroll-mt-6" />
           <CardHeader
             title="Marketing Stream (hourly data)"
-            sub="Each enabled profile needs its own sp-traffic and sp-conversion subscription to send hourly data to your SQS queues."
+            sub="Each enabled profile needs its own subscription per dataset to send hourly data to your SQS queues. Hover a status for details."
           />
-          <div className="flex flex-wrap gap-x-6 gap-y-1 border-b border-line px-6 py-3 text-xs text-muted">
-            {(["sp-traffic", "sp-conversion"] as const).map((d) => (
-              <span key={d}>
-                <span className="font-semibold text-ink-2">{d}</span> →{" "}
-                {destinations[d] ? (
-                  <code className="text-ink-2">{destinations[d]}</code>
-                ) : (
-                  <span className="font-semibold text-bad">no queue in STREAM_SQS_QUEUE_URLS (queue name must contain &quot;{d}&quot;)</span>
-                )}
+          <div className="grid gap-x-6 gap-y-1 border-b border-line px-6 py-3 text-xs text-muted sm:grid-cols-2">
+            {AD_TYPES.flatMap((t) => t.datasets).map((d) => (
+              <span key={d} className="truncate">
+                <span className="inline-block w-24 font-semibold text-ink-2">{d}</span>
+                {destinations[d] ? <code className="text-ink-2">{destinations[d]}</code> : <span className="text-faint">no queue configured</span>}
               </span>
             ))}
           </div>
@@ -197,8 +193,11 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
               <thead>
                 <tr className="border-b border-line bg-canvas text-left text-[11px] font-bold tracking-[0.14em] text-muted uppercase">
                   <th className="py-3 pr-4 pl-6">Profile</th>
-                  <th className="px-4">sp-traffic</th>
-                  <th className="px-4">sp-conversion</th>
+                  {AD_TYPES.map((t) => (
+                    <th key={t.key} className="px-4" title={t.label}>
+                      {t.key}
+                    </th>
+                  ))}
                   <th className="pr-6" />
                 </tr>
               </thead>
@@ -213,7 +212,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
                     </td>
                     <Suspense
                       fallback={
-                        <td className="px-4 py-3 text-xs text-muted" colSpan={3}>
+                        <td className="px-4 py-3 text-xs text-muted" colSpan={AD_TYPES.length + 1}>
                           <Radio className="mr-1.5 inline size-3.5 animate-pulse" strokeWidth={1.5} />
                           Checking with Amazon…
                         </td>

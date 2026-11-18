@@ -25,6 +25,11 @@ export function todayInTz(tz: string, now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
 
+/** Current hour (0–23) in an IANA timezone. */
+export function hourInTz(tz: string, now = new Date()): number {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(now));
+}
+
 export function todayUtc(): string {
   return toYmd(new Date());
 }

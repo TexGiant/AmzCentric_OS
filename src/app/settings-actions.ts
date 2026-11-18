@@ -139,19 +139,26 @@ export async function subscribeStream(form: FormData) {
   const account = (Array.isArray(row!.account) ? row!.account[0] : row!.account) as AdsAccount;
   const name = row!.account_name ?? profileId;
 
+  const errMsg = (err: unknown) => (err instanceof AdsApiError ? `${err.status} ${err.body.slice(0, 240)}` : String(err).slice(0, 240));
   let created = 0;
+  const failures: string[] = [];
+  let existing: Awaited<ReturnType<typeof listStreamSubscriptions>> = [];
   try {
-    const existing = await listStreamSubscriptions(account, profileId);
-    for (const dataset of STREAM_DATASETS) {
-      const arn = destinations[dataset];
-      if (!arn) continue;
-      if (existing.some((s) => s.dataSetId === dataset && s.destinationArn === arn && isLive(s))) continue;
+    existing = await listStreamSubscriptions(account, profileId);
+  } catch (err) {
+    back({ stream_error: `${name}: couldn't list subscriptions (${errMsg(err)})` });
+  }
+  // One dataset failing (e.g. no Sponsored Display on this account) shouldn't block the rest.
+  for (const dataset of STREAM_DATASETS) {
+    const arn = destinations[dataset];
+    if (!arn) continue;
+    if (existing.some((s) => s.dataSetId === dataset && s.destinationArn === arn && isLive(s))) continue;
+    try {
       await createStreamSubscription(account, profileId, dataset, arn);
       created++;
+    } catch (err) {
+      failures.push(`${dataset}: ${errMsg(err)}`);
     }
-  } catch (err) {
-    const msg = err instanceof AdsApiError ? `${err.message}: ${err.body.slice(0, 300)}` : String(err);
-    back({ stream_error: `${name}: ${msg}` });
   }
 
   // Amazon sends an SNS confirmation message to each queue; reading the queue confirms it.
@@ -160,5 +167,6 @@ export async function subscribeStream(form: FormData) {
     await ingestStream(Date.now() + 25_000).catch(() => undefined);
   }
   revalidatePath("/settings/connections");
+  if (failures.length) back({ stream_error: `${name}: created ${created}; failed ${failures.join(" | ")}` });
   back({ stream_ok: created > 0 ? `${name}: created ${created} subscription(s)` : `${name}: already subscribed` });
 }
