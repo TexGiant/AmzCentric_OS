@@ -73,7 +73,7 @@ export function toConversionRow(r: Rec) {
 type Parsed =
   | { kind: "traffic"; row: ReturnType<typeof toTrafficRow> }
   | { kind: "conversion"; row: ReturnType<typeof toConversionRow> }
-  | { kind: "confirm"; url: string }
+  | { kind: "confirm"; url: string; topic: string }
   | { kind: "ignored" };
 
 export function parseBody(body: string): Parsed[] {
@@ -84,7 +84,7 @@ export function parseBody(body: string): Parsed[] {
     return [{ kind: "ignored" }];
   }
   if (outer.Type === "SubscriptionConfirmation" && typeof outer.SubscribeURL === "string") {
-    return [{ kind: "confirm", url: outer.SubscribeURL }];
+    return [{ kind: "confirm", url: outer.SubscribeURL, topic: String(outer.TopicArn ?? "") }];
   }
   let inner: unknown = outer;
   if (outer.Type === "Notification" && typeof outer.Message === "string") {
@@ -124,6 +124,7 @@ export type IngestResult = {
   conversion: number;
   ignored: number;
   confirmed: number;
+  confirmedTopics: string[];
   errors: string[];
 };
 
@@ -136,7 +137,7 @@ export async function ingestStream(deadline: number): Promise<IngestResult> {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const out: IngestResult = { queues: urls.length, messages: 0, traffic: 0, conversion: 0, ignored: 0, confirmed: 0, errors: [] };
+  const out: IngestResult = { queues: urls.length, messages: 0, traffic: 0, conversion: 0, ignored: 0, confirmed: 0, confirmedTopics: [], errors: [] };
   if (!urls.length) return out;
 
   const db = createAdminClient();
@@ -184,13 +185,27 @@ export async function ingestStream(deadline: number): Promise<IngestResult> {
 
         const traffic: ReturnType<typeof toTrafficRow>[] = [];
         const conversion: ReturnType<typeof toConversionRow>[] = [];
+        // Confirmation messages are kept in the queue (retried next run) unless confirming succeeds.
+        const keep = new Set<Message>();
         for (const m of messages) {
           for (const p of parseBody(m.Body ?? "")) {
             if (p.kind === "traffic") traffic.push(p.row);
             else if (p.kind === "conversion") conversion.push(p.row);
-            else if (p.kind === "confirm" && isSnsUrl(p.url)) {
-              await fetch(p.url).catch(() => undefined);
-              out.confirmed++;
+            else if (p.kind === "confirm") {
+              const queueName = queueUrl.split("/").pop();
+              if (!isSnsUrl(p.url)) {
+                out.errors.push(`${queueName}: ignored confirmation with unexpected URL host`);
+                continue;
+              }
+              const res = await fetch(p.url, { cache: "no-store" }).catch((e: unknown) => e);
+              if (res instanceof Response && res.ok) {
+                out.confirmed++;
+                out.confirmedTopics.push(`${queueName} ← ${p.topic}`);
+              } else {
+                keep.add(m);
+                const why = res instanceof Response ? `HTTP ${res.status}` : String(res);
+                out.errors.push(`${queueName}: confirming ${p.topic} failed (${why}); will retry`);
+              }
             } else out.ignored++;
           }
         }
@@ -211,12 +226,17 @@ export async function ingestStream(deadline: number): Promise<IngestResult> {
         out.messages += messages.length;
         out.traffic += traffic.length;
         out.conversion += conversion.length;
-        await sqs.send(
-          new DeleteMessageBatchCommand({
-            QueueUrl: queueUrl,
-            Entries: messages.map((m, i) => ({ Id: String(i), ReceiptHandle: m.ReceiptHandle! })),
-          }),
-        );
+        const done = messages.filter((m) => !keep.has(m));
+        if (done.length) {
+          await sqs.send(
+            new DeleteMessageBatchCommand({
+              QueueUrl: queueUrl,
+              Entries: done.map((m, i) => ({ Id: String(i), ReceiptHandle: m.ReceiptHandle! })),
+            }),
+          );
+        }
+        // A failed confirmation stays in the queue; stop this queue's loop so we don't spin on it.
+        if (keep.size) return;
       }
     }),
   );

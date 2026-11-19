@@ -56,12 +56,19 @@ export async function StreamStatusCells({
       );
     const allActive = live.length === states.length && live.every((s) => s.status === "ACTIVE");
     const incomplete = live.length < states.length || configured.length < t.datasets.length;
+    const notActive = states.find((s) => s.status && s.status !== "ACTIVE")?.status;
+    const human = (st: string) => st.charAt(0) + st.slice(1).toLowerCase().replaceAll("_", " ");
     return (
-      <span title={detail}>
+      <div title={detail}>
         <Pill tone={allActive && !incomplete ? "good" : "warn"} dot>
-          {allActive ? (incomplete ? "Partial" : "Active") : "Pending"}
+          {allActive ? (incomplete ? "Partial" : "Active") : human(notActive ?? "PENDING")}
         </Pill>
-      </span>
+        {!(allActive && !incomplete) && (
+          <div className="mt-1 max-w-[220px] text-[11px] leading-snug text-faint">
+            {states.map((s) => `${s.d.split("-")[1]}: ${s.status ? human(s.status) : "not subscribed"}`).join(" · ")}
+          </div>
+        )}
+      </div>
     );
   });
 
