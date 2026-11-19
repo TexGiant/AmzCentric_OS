@@ -31,7 +31,7 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
         subtitle={`${brand.name} · ${range.from} → ${range.to}`}
         right={<RangeTabs basePath={base} current={range.days} extra={{ type }} />}
       />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-7">
         <Kpi size="sm" label="Spend" value={money(t.cost)} delta={change(t.cost, tp.cost)} invert />
         <Kpi size="sm" label="Sales" value={money(t.sales)} delta={change(t.sales, tp.sales)} />
         <Kpi size="sm" label="ACOS" value={pct(acos(t))} delta={change(acos(t), acos(tp))} invert />

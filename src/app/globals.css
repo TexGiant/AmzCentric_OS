@@ -157,3 +157,18 @@ select.amz-select {
     animation-duration: 0ms !important;
   }
 }
+
+/* .amz-skeleton — shimmering placeholder while data loads */
+.amz-skeleton {
+  background: linear-gradient(90deg, rgb(0 15 34 / 0.06) 25%, rgb(0 15 34 / 0.11) 50%, rgb(0 15 34 / 0.06) 75%);
+  background-size: 200% 100%;
+  animation: amz-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes amz-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}

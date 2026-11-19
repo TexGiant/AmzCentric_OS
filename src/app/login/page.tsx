@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <Eyebrow>Team sign-in</Eyebrow>
           <h1 className="mt-2 font-display text-2xl font-semibold tracking-[-0.01em] text-ink">Welcome back</h1>
           <p className="mt-1.5 text-sm text-muted">AmzCentric team members only.</p>
-          <LoginForm next={next?.startsWith("/") ? next : "/dashboard"} initialError={error} />
+          <LoginForm key={error ?? "none"} next={next?.startsWith("/") ? next : "/dashboard"} initialError={error} />
         </div>
         <p className="mt-6 text-center text-xs font-semibold text-navy-700/70">Amazon advertising analytics · AmzCentric OS</p>
       </div>

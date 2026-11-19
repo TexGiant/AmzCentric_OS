@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import { RANGE_OPTIONS } from "@/lib/dates";
+import { LinkPulse } from "@/components/link-pending";
 
 /*
  * React versions of the AmzCentric CSS components (.amz-*), built on the
@@ -230,7 +231,7 @@ export function Segmented({ items }: { items: Array<{ href: string; label: strin
     <div className={segmentedClass}>
       {items.map((i) => (
         <Link key={i.href} href={i.href} className={segmentedItemClass(i.active)}>
-          {i.label}
+          <LinkPulse>{i.label}</LinkPulse>
         </Link>
       ))}
     </div>
@@ -264,7 +265,7 @@ export function Tabs({ items }: { items: Array<{ href: string; label: string; ac
               : "text-muted hover:text-ink",
           )}
         >
-          {t.label}
+          <LinkPulse>{t.label}</LinkPulse>
           {t.count != null && (
             <span className={cn("rounded-pill px-2 py-0.5 text-[11px] font-bold", t.active ? "bg-gold-100 text-gold-800" : "bg-canvas text-muted")}>
               {t.count}

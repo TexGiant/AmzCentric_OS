@@ -27,8 +27,15 @@ export const getUser = cache(async (): Promise<SessionUser | null> => {
 
 export async function requireUser(): Promise<SessionUser> {
   const user = await getUser();
-  if (!user) redirect("/login");
-  return user;
+  if (user) return user;
+  if (!isDemoMode()) {
+    const { data } = await (await createClient()).auth.getUser();
+    const email = data.user?.email;
+    if (email && !isAllowedEmail(email)) {
+      redirect(`/login?error=${encodeURIComponent(`${email} isn't allowed to use AmzCentric OS. Sign in with your work email.`)}`);
+    }
+  }
+  redirect("/login");
 }
 
 export async function requireAdmin(): Promise<SessionUser> {

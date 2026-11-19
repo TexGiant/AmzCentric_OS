@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { Loader2 } from "lucide-react";
+import { LinkSpinner } from "@/components/link-pending";
+import { startNavigation } from "@/components/nav-progress";
 import {
   BarChart3,
   Boxes,
@@ -45,6 +48,8 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [switching, startSwitch] = useTransition();
+  const [pendingBrand, setPendingBrand] = useState<string | null>(null);
   useEffect(() => setOpen(false), [pathname]);
 
   const match = pathname.match(/^\/dashboard\/([^/]+)/);
@@ -107,10 +112,17 @@ export function Sidebar({
       <div className="px-4">
         <label className="block">
           <span className="mb-2 block px-3 text-[11px] font-bold tracking-[0.14em] text-faint uppercase">Brand</span>
+          <div className="relative">
           <select
-            value={current?.slug ?? ""}
-            onChange={(e) => router.push(e.target.value ? `/dashboard/${e.target.value}` : "/dashboard")}
-            className={cn(selectClass, "font-semibold")}
+            value={switching && pendingBrand !== null ? pendingBrand : (current?.slug ?? "")}
+            onChange={(e) => {
+              const slug = e.target.value;
+              setPendingBrand(slug);
+              startNavigation();
+              startSwitch(() => router.push(slug ? `/dashboard/${slug}` : "/dashboard"));
+            }}
+            aria-busy={switching}
+            className={cn(selectClass, "font-semibold", switching && "border-brand text-muted")}
           >
             <option value="">All brands</option>
             {brands.map((b) => (
@@ -120,6 +132,13 @@ export function Sidebar({
               </option>
             ))}
           </select>
+          {switching && (
+            <span className="pointer-events-none absolute top-1/2 right-9 flex -translate-y-1/2 items-center gap-1.5 text-xs font-bold text-brand-ink">
+              <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+              Loading
+            </span>
+          )}
+          </div>
         </label>
       </div>
 
@@ -202,6 +221,7 @@ function NavItem({ href, label, icon: Icon, active, soon }: Item & { active: boo
       <Icon className="size-[18px] shrink-0" strokeWidth={STROKE} />
       <span className="flex-1">{label}</span>
       {soon && <span className="rounded-pill bg-surface px-2 py-0.5 text-[10px] font-bold text-faint ring-1 ring-line">{soon}</span>}
+      <LinkSpinner className="text-brand-ink" />
     </Link>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { startNavigation } from "@/components/nav-progress";
 import { createClient } from "@/lib/supabase/client";
 import { Eyebrow, Logo, buttonClass, cn, inputClass } from "@/components/ui";
 
@@ -18,8 +20,11 @@ export default function SetPasswordPage() {
     if (password !== String(form.get("confirm"))) return setError("Passwords don't match.");
     setBusy(true);
     const { error } = await createClient().auth.updateUser({ password });
-    setBusy(false);
-    if (error) return setError(error.message);
+    if (error) {
+      setBusy(false);
+      return setError(error.message);
+    }
+    startNavigation();
     router.replace("/dashboard");
     router.refresh();
   }
@@ -38,7 +43,8 @@ export default function SetPasswordPage() {
           <input name="confirm" type="password" placeholder="Confirm password" autoComplete="new-password" className={inputClass} required />
           {error && <p className="text-xs font-semibold text-bad">{error}</p>}
           <button className={cn(buttonClass.primary, "h-12 w-full text-base")} disabled={busy}>
-            {busy ? "Saving…" : "Save and continue"}
+            {busy && <Loader2 className="size-4 animate-spin" strokeWidth={2} />}
+            {busy ? "Saving & opening dashboard…" : "Save and continue"}
           </button>
         </form>
       </div>
