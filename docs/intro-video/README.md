@@ -24,3 +24,14 @@ ffmpeg -i /tmp/intro/intro-silent.mp4 -i music.mp3 \
 ```
 
 Scenes, captions and spotlight timings live in `build-video.js`. Music: "A Beginning" (Rymdklang Soundtracks), Epidemic Sound, edited to 110.4 s.
+
+## Claude connector launch video
+
+`AmzCentric-OS-Claude-Connector-Launch.mp4` (~69 s). Build the app with `NEXT_PUBLIC_SITE_URL=http://localhost:3100` in demo mode, run it on :3100, then:
+
+```bash
+node docs/intro-video/launch-data.mjs /tmp/launch/shots   # connects like Claude, records real tool answers + consent/settings screenshots
+# crop the consent card to shots/consent-crop.png, copy fonts/ and logo.png into /tmp/launch
+node docs/intro-video/build-launch.js /tmp/launch
+node docs/intro-video/render-video.js /tmp/launch render /tmp/launch/launch-silent.mp4 30
+```
