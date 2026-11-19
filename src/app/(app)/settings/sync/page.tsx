@@ -58,7 +58,7 @@ export default async function SyncPage() {
       <PageHeader
         eyebrow="Settings"
         title="Data sync"
-        subtitle="Daily reports are requested at 06:00 UTC, checked every 30 minutes, and Marketing Stream is pulled from SQS every 10 minutes."
+        subtitle="Daily reports (last 7 days) are requested at 11:00 and 19:00 UTC, about 3 AM and 11 AM Pacific, checked every 30 minutes, and Marketing Stream is pulled from SQS every 10 minutes."
         right={demo ? <Pill tone="warn">Demo mode: nothing to sync</Pill> : undefined}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

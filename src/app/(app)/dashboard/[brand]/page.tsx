@@ -4,7 +4,7 @@ import { Card, CardHeader, IconChip, Kpi, PageHeader, Pill } from "@/components/
 import { Legend, SalesSpendChart } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
-import { addDays, daysInMonth, hourInTz, monthStart, shortDate, todayInTz } from "@/lib/dates";
+import { addDays, daysInMonth, eachDay, hourInTz, monthStart, shortDate, todayInTz } from "@/lib/dates";
 import { int, money, pct } from "@/lib/format";
 import { acos, change, sum, tacos, type Totals } from "@/lib/metrics";
 import { attentionItems, type Insight } from "@/lib/insights";
@@ -22,7 +22,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
   const from = addDays(to, -59);
   const month = monthStart(to);
 
-  const [daily, hourlyToday, hourlyYesterday, campaignsNow, campaignsPrev, goal, actions] = await Promise.all([
+  const [reported, hourlyToday, hourlyYesterday, campaignsNow, campaignsPrev, goal, actions] = await Promise.all([
     ds.brandDaily(slug, from, to),
     ds.hourly(slug, today),
     ds.hourly(slug, to),
@@ -32,17 +32,28 @@ export default async function BrandOverview({ params }: { params: BrandParams })
     ds.actions(slug, 50),
   ]);
 
+  // One entry per calendar day, so "Yesterday" is always yesterday's date even when a
+  // report is late. If yesterday's report isn't in yet, use its Marketing Stream hourly
+  // totals as a preliminary figure (replaced by the report once it lands).
+  const byDate = new Map(reported.map((d) => [d.date, d]));
+  const yesterdayPending = !byDate.has(to);
+  if (yesterdayPending) {
+    byDate.set(to, { date: to, ...sum(hourlyYesterday.map((h) => ({ ...h, units: 0 }))), totalSales: null });
+  }
+  const daily = eachDay(from, to).map(
+    (date) => byDate.get(date) ?? { date, impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0, units: 0, totalSales: null },
+  );
   const win = (days: number, offset = 0) => sum(daily.slice(daily.length - days - offset, daily.length - offset));
   const nowHour = hourInTz(status.timezone);
   const live = sum(hourlyToday.map((h) => ({ ...h, units: 0 })));
   const liveCompare = sum(hourlyYesterday.filter((h) => h.hour <= nowHour).map((h) => ({ ...h, units: 0 })));
 
-  const cards: Array<{ label: string; now: Totals; prev: Totals; live?: boolean }> = [
-    { label: "Today", now: live, prev: liveCompare, live: true },
-    { label: "Yesterday", now: win(1), prev: win(1, 7) },
-    { label: "7 days", now: win(7), prev: win(7, 7) },
-    { label: "14 days", now: win(14), prev: win(14, 14) },
-    { label: "30 days", now: win(30), prev: win(30, 30) },
+  const cards: Array<{ label: string; now: Totals; prev: Totals; live?: boolean; preliminary?: boolean }> = [
+    { label: `Today · ${shortDate(today)}`, now: live, prev: liveCompare, live: true },
+    { label: `Yesterday · ${shortDate(to)}`, now: win(1), prev: win(1, 7), preliminary: yesterdayPending },
+    { label: "7 days", now: win(7), prev: win(7, 7), preliminary: yesterdayPending },
+    { label: "14 days", now: win(14), prev: win(14, 14), preliminary: yesterdayPending },
+    { label: "30 days", now: win(30), prev: win(30, 30), preliminary: yesterdayPending },
   ];
 
   const mtd = sum(daily.filter((d) => d.date >= month));
@@ -90,7 +101,17 @@ export default async function BrandOverview({ params }: { params: BrandParams })
             key={c.label}
             label={c.label}
             highlight={c.live}
-            badge={c.live ? <Pill tone="good" dot>Live</Pill> : undefined}
+            badge={
+              c.live ? (
+                <Pill tone="good" dot>
+                  Live
+                </Pill>
+              ) : c.preliminary && c.label.startsWith("Yesterday") ? (
+                <Pill tone="warn" dot>
+                  Preliminary
+                </Pill>
+              ) : undefined
+            }
             value={money(c.now.sales)}
             unit="ad sales"
             sub={
@@ -105,6 +126,14 @@ export default async function BrandOverview({ params }: { params: BrandParams })
       </div>
       <p className="mt-2 text-xs text-faint">
         &ldquo;Today&rdquo; is live hourly Marketing Stream data in the marketplace&apos;s timezone, compared with yesterday at the same hour.
+        {yesterdayPending && (
+          <>
+            {" "}
+            <span className="font-semibold text-warn-ink">
+              {shortDate(to)}&apos;s Amazon report hasn&apos;t arrived yet, so yesterday uses hourly Stream data for now; it updates automatically once the report lands.
+            </span>
+          </>
+        )}
       </p>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-3">

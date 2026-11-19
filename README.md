@@ -28,7 +28,7 @@ The app runs on **demo data** until Supabase is configured, so you can click thr
 ## How data flows
 
 ```
-Amazon Ads API ──(06:00 UTC cron: request last 7 days)──► report_jobs (pending)
+Amazon Ads API ──(11:00 + 19:00 UTC cron: request last 7 days)──► report_jobs (pending)
                ◄─(every 30 min: poll, download gzip JSON)─┘
                      │
                      ▼
