@@ -3,12 +3,13 @@ import { Card, CardHeader, Kpi, PageHeader, Pill, cn } from "@/components/ui";
 import { ActionForm } from "@/components/forms";
 import { deleteAction } from "@/app/workspace-actions";
 import { data, ACTION_CATEGORIES } from "@/lib/data";
-import { addDays, daysBetween, shortDate, todayUtc } from "@/lib/dates";
+import { addDays, shortDate, todayUtc } from "@/lib/dates";
+import { IMPACT_WINDOW, measureActions } from "@/lib/action-impact";
 import { money, pct } from "@/lib/format";
 import { acos, change } from "@/lib/metrics";
 import { getBrandOr404, type BrandParams } from "@/lib/page";
 
-const WINDOW = 14;
+const WINDOW = IMPACT_WINDOW;
 
 export default async function ActionLogPage({ params }: { params: BrandParams }) {
   const { brand: slug } = await params;
@@ -23,18 +24,7 @@ export default async function ActionLogPage({ params }: { params: BrandParams })
   ]);
 
   // Before = 14 days before the action; after = action day + 13 days (or up to yesterday).
-  const measured = await Promise.all(
-    actions.slice(0, 40).map(async (a) => {
-      const afterEnd = addDays(a.actionDate, WINDOW - 1) < yesterday ? addDays(a.actionDate, WINDOW - 1) : yesterday;
-      const afterDays = daysBetween(a.actionDate, afterEnd) + 1;
-      if (afterDays < 3) return { a, afterDays, before: null, after: null };
-      const [before, after] = await Promise.all([
-        ds.window(slug, a.campaignId, addDays(a.actionDate, -WINDOW), addDays(a.actionDate, -1)),
-        ds.window(slug, a.campaignId, a.actionDate, afterEnd),
-      ]);
-      return { a, afterDays, before, after };
-    }),
-  );
+  const measured = await measureActions(ds, slug, actions.slice(0, 40), yesterday);
 
   const label = (c: string) => ACTION_CATEGORIES.find((x) => x.value === c)?.label ?? c;
   const last30 = actions.filter((a) => a.actionDate >= addDays(today, -30));

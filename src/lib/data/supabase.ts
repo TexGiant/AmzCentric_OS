@@ -1,5 +1,7 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Totals } from "@/lib/metrics";
 import type {
   ActionEntry,
@@ -27,16 +29,25 @@ function totals(r: Row): Totals {
   };
 }
 
-async function rpc(fn: string, args: Record<string, unknown>): Promise<Row[]> {
-  const db = await createClient();
+type GetDb = () => Promise<SupabaseClient> | SupabaseClient;
+
+async function rpcWith(getDb: GetDb, fn: string, args: Record<string, unknown>): Promise<Row[]> {
+  const db = await getDb();
   const { data, error } = await db.rpc(fn, args);
   if (error) throw new Error(`${fn}: ${error.message}`);
   return (data ?? []) as Row[];
 }
 
-export const supabaseSource: DataSource = {
+/**
+ * Data source over a Supabase client. The dashboard uses the signed-in user's client
+ * (RLS applies); the Claude connector uses the service-role client after verifying
+ * the caller's OAuth token itself.
+ */
+export function makeSupabaseSource(getDb: GetDb): DataSource {
+  const rpc = (fn: string, args: Record<string, unknown>) => rpcWith(getDb, fn, args);
+  return {
   async listBrands() {
-    const db = await createClient();
+    const db = await getDb();
     const { data, error } = await db
       .from("brands")
       .select("slug, name, amazon_profiles(country_code, enabled)")
@@ -54,7 +65,7 @@ export const supabaseSource: DataSource = {
   },
 
   async brandStatus(brand) {
-    const db = await createClient();
+    const db = await getDb();
     const [{ count }, through, campaigns] = await Promise.all([
       db.from("amazon_profiles").select("profile_id", { count: "exact", head: true }).eq("brand_slug", brand).eq("enabled", true),
       db.rpc("brand_data_through", { p_brand: brand }),
@@ -136,7 +147,7 @@ export const supabaseSource: DataSource = {
   },
 
   async actions(brand, limit = 100) {
-    const db = await createClient();
+    const db = await getDb();
     const { data, error } = await db
       .from("action_log")
       .select("id, action_date, category, description, campaign_id, campaign_name, author_email")
@@ -157,7 +168,7 @@ export const supabaseSource: DataSource = {
   },
 
   async goal(brand, month) {
-    const db = await createClient();
+    const db = await getDb();
     const { data } = await db.from("goals").select("*").eq("brand_slug", brand).eq("month", month).maybeSingle();
     if (!data) return null;
     return {
@@ -168,3 +179,7 @@ export const supabaseSource: DataSource = {
     } satisfies Goal;
   },
 };
+}
+
+export const supabaseSource: DataSource = makeSupabaseSource(createClient);
+export const adminSource: DataSource = makeSupabaseSource(createAdminClient);

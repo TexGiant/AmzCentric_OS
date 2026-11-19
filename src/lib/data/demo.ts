@@ -274,7 +274,7 @@ export const demoSource: DataSource = {
     return sum(cs.map((c) => campaignRange(b, c, from, to)));
   },
 
-  async actions(slug) {
+  async actions(slug, limit = 100) {
     const b = brandBySlug(slug);
     if (!b) return [];
     const t = todayUtc();
@@ -287,7 +287,7 @@ export const demoSource: DataSource = {
       { actionDate: addDays(t, -26), category: "budget", description: "Budget $60 → $90/day, capped out by 4pm daily", campaignId: c[3].id, campaignName: c[3].name, authorEmail: "sam@amzcentric.com" },
       { actionDate: addDays(t, -33), category: "launch", description: "Launched competitor ASIN targeting", campaignId: c[c.length - 1].id, campaignName: c[c.length - 1].name, authorEmail: "priya@amzcentric.com" },
     ];
-    return entries.map((e, i) => ({ id: `demo-${i}`, ...e }));
+    return entries.slice(0, limit).map((e, i) => ({ id: `demo-${i}`, ...e }));
   },
 
   async goal(slug, month) {

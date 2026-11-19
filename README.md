@@ -117,6 +117,15 @@ You already receive Stream data into SQS. The app needs to read from those queue
 3. Enable the profiles you manage and assign each one to a brand.
 4. **Settings → Data Sync** → request a 60–95 day backfill → click *Check reports* after a few minutes (Amazon takes about 1–20 minutes per report). After that, the crons keep data current.
 
+## Claude connector (MCP)
+
+Teammates can connect Claude (claude.ai, desktop, mobile, Claude Code) to AmzCentric OS and ask about any brand, or have Claude log actions. Setup steps and active connections: **Settings → Claude connector**.
+
+- Endpoint: `https://<your domain>/api/mcp` (MCP Streamable HTTP, stateless). `NEXT_PUBLIC_SITE_URL` must be the exact domain people use.
+- Sign-in: built-in OAuth 2.1 server, dynamic client registration, authorization code + PKCE (S256), refresh-token rotation with reuse detection. Each person approves with their own AmzCentric OS login; the same domain/team rules apply. Tokens are stored hashed (`supabase/migrations/0003_claude_connector_oauth.sql`).
+- Allowed redirect URIs: `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback`, `http://localhost:*` (Claude Code / MCP Inspector), plus any in `OAUTH_EXTRA_REDIRECT_URIS`.
+- Tools (`src/lib/mcp/server.ts`): `list_brands`, `get_brand_overview`, `get_what_changed`, `get_campaigns`, `get_search_terms`, `get_products`, `get_hourly`, `get_action_log`, `get_goals` (read-only) and `log_action` (writes to the Action Log as the signed-in user). Nothing can change Amazon.
+
 ## Brand & design system
 
 The UI follows **AmzCentric CSS v1.0**: white pages, navy `#000F22` ink, amber `#F8A42E` as the one action color, Montserrat for headings and figures, Manrope for everything else.

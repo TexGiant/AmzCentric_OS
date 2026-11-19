@@ -8,6 +8,7 @@ import { LinkSpinner } from "@/components/link-pending";
 import { startNavigation } from "@/components/nav-progress";
 import {
   BarChart3,
+  Bot,
   Boxes,
   Clock,
   Database,
@@ -89,6 +90,7 @@ export function Sidebar({
     { href: "/settings/connections", label: "Connections", icon: PlugZap },
     { href: "/settings/brands", label: "Brands", icon: Tags },
     { href: "/settings/sync", label: "Data Sync", icon: Database },
+    { href: "/settings/claude", label: "Claude connector", icon: Bot },
     ...(isAdmin ? [{ href: "/settings/team", label: "Team", icon: Users }] : []),
   ];
 

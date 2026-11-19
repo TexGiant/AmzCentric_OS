@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "3.1171.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.119.0",
     "lucide-react": "1.74.0",
@@ -17,7 +18,8 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "recharts": "3.11.0",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.5",
