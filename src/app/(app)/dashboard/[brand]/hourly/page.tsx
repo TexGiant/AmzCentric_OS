@@ -20,8 +20,11 @@ export default async function HourlyPage({ params, searchParams }: { params: Bra
   const day = days.includes(param(sp, "day") ?? "") ? param(sp, "day")! : today;
 
   const prior = Array.from({ length: 7 }, (_, i) => addDays(day, -(i + 1)));
-  const [hours, ...history] = await Promise.all([ds.hourly(slug, day), ...prior.map((d) => ds.hourly(slug, d))]);
-  const avg = (h: number, key: "sales" | "cost" | "clicks") => history.reduce((a, d) => a + (d[h]?.[key] ?? 0), 0) / history.length;
+  // The 7-day average is a nice-to-have: a slow or failed day must not take the page down.
+  const [hours, settled] = await Promise.all([ds.hourly(slug, day), Promise.allSettled(prior.map((d) => ds.hourly(slug, d)))]);
+  const history = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+  const avg = (h: number, key: "sales" | "cost" | "clicks") =>
+    history.length ? history.reduce((a, d) => a + (d[h]?.[key] ?? 0), 0) / history.length : 0;
 
   const total = hours.reduce(
     (a, h) => ({
