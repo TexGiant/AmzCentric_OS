@@ -63,7 +63,7 @@ Marketing Stream ──SNS──► SQS ──(every 10 min)──► stream_tra
 ### 1. Supabase
 
 1. Create a project and copy its URL, anon key and service-role key into the env vars (step 5).
-2. **SQL Editor** → paste and run `supabase/migrations/0001_init.sql`.
+2. **SQL Editor** → paste and run `supabase/migrations/0001_init.sql`, then each later file in `supabase/migrations/` in number order (`0002_…`, …).
 3. **Authentication → Sign In / Providers**: turn **off** "Allow new users to sign up". This makes the app invite-only.
 4. **Authentication → URL Configuration**: Site URL `https://os.amzcentric.com`. Add `https://os.amzcentric.com/**` to Redirect URLs (plus `http://localhost:3000/**` for local dev).
 5. **Authentication → Email Templates → Invite user**: change the link to
