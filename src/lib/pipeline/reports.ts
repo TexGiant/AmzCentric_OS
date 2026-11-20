@@ -1,7 +1,7 @@
 import "server-only";
 import { gunzipSync } from "node:zlib";
 import { adsRequest, AdsApiError, type AdsAccount } from "@/lib/amazon/ads";
-import { addDays, chunkRange, todayInTz } from "@/lib/dates";
+import { addDays, chunkRange, todayInTz, todayUtc } from "@/lib/dates";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ALL_REPORT_TYPES,
@@ -137,18 +137,24 @@ export function backfill(days: number, profileIds?: string[], types?: ReportType
     byRetention.set(r, [...(byRetention.get(r) ?? []), t]);
   }
   return Promise.all(
-    [...byRetention.entries()].map(([d, ts]) =>
-      requestReports({
+    [...byRetention.entries()].map(([d, ts]) => {
+      // Amazon counts retention back from *its* today (UTC), which can already be a day
+      // ahead of the marketplace — so never start earlier than UTC today − retention,
+      // with a 1-day safety margin.
+      const retention = Math.min(...ts.map((t) => REPORT_SPECS[t].retentionDays));
+      const earliest = addDays(todayUtc(), -(retention - 1));
+      return requestReports({
         profileIds,
         types: ts,
         source: "backfill",
         paceMs: 120,
         windows: (p) => {
           const end = addDays(todayInTz(p.timezone), -1);
-          return chunkRange(addDays(end, -(d - 1)), end, 31);
+          const wanted = addDays(end, -(d - 1));
+          return chunkRange(wanted < earliest ? earliest : wanted, end, 31);
         },
-      }),
-    ),
+      });
+    }),
   ).then((results) =>
     results.reduce<RequestResult>(
       (a, r) => ({ created: a.created + r.created, failed: a.failed + r.failed, errors: [...a.errors, ...r.errors] }),
