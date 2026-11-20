@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedEmail } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/safe-next";
 
 /** Exchanges a Supabase PKCE code (magic link, password reset, OAuth) for a session. */
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
-  const nextParam = req.nextUrl.searchParams.get("next") ?? "/dashboard";
-  const next = nextParam.startsWith("/") ? nextParam : "/dashboard";
+  const next = safeNext(req.nextUrl.searchParams.get("next"));
   if (!code) return NextResponse.redirect(new URL("/login?error=Missing+code", req.url));
 
   const supabase = await createClient();

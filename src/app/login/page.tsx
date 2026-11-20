@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { Eyebrow, Logo } from "@/components/ui";
 import { LoginForm } from "./login-form";
 import { isDemoMode } from "@/lib/env";
+import { safeNext } from "@/lib/safe-next";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string; email?: string }> }) {
   if (isDemoMode()) redirect("/dashboard");
-  const { next, error } = await searchParams;
+  const { next, error, email } = await searchParams;
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12" style={{ background: "var(--hero-gradient)" }}>
       <div className="w-full max-w-[400px]">
@@ -18,7 +19,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <Eyebrow>Team sign-in</Eyebrow>
           <h1 className="mt-2 font-display text-2xl font-semibold tracking-[-0.01em] text-ink">Welcome back</h1>
           <p className="mt-1.5 text-sm text-muted">AmzCentric team members only.</p>
-          <LoginForm key={error ?? "none"} next={next?.startsWith("/") ? next : "/dashboard"} initialError={error} />
+          <LoginForm key={error ?? "none"} next={safeNext(next)} initialError={error} initialEmail={email} />
         </div>
         <p className="mt-6 text-center text-xs font-semibold text-navy-700/70">Amazon advertising analytics · AmzCentric OS</p>
       </div>

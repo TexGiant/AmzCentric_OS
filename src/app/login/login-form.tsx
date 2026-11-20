@@ -1,40 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { startNavigation } from "@/components/nav-progress";
 import { createClient } from "@/lib/supabase/client";
 import { buttonClass, cn, inputClass, labelClass } from "@/components/ui";
 
-export function LoginForm({ next, initialError }: { next: string; initialError?: string }) {
-  const router = useRouter();
+/*
+ * A plain HTML form that POSTs to /auth/login. Submitting for real (not via fetch) is what
+ * makes Chrome, Safari, Edge and Firefox offer to save the email + password, and lets them
+ * autofill it next time. Fields stay enabled while submitting: disabled fields are left out
+ * of the submission and ignored by password managers.
+ */
+export function LoginForm({ next, initialError, initialEmail }: { next: string; initialError?: string; initialEmail?: string }) {
   const [error, setError] = useState(initialError ?? "");
   const [info, setInfo] = useState("");
-  // idle → signing (checking password) → opening (password OK, loading the dashboard)
-  const [phase, setPhase] = useState<"idle" | "signing" | "opening">("idle");
-  const busy = phase !== "idle";
+  const [busy, setBusy] = useState(false);
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setPhase("signing");
-    setError("");
-    setInfo("");
-    const form = new FormData(e.currentTarget);
-    const { error } = await createClient().auth.signInWithPassword({
-      email: String(form.get("email")),
-      password: String(form.get("password")),
-    });
-    if (error) {
-      setPhase("idle");
-      return setError(error.message);
-    }
-    // Keep the button busy until the dashboard has actually loaded.
-    setPhase("opening");
-    startNavigation();
-    router.replace(next);
-    router.refresh();
-  }
+  // Coming back with the Back button restores this page from cache — un-stick the button.
+  useEffect(() => {
+    const reset = (e: PageTransitionEvent) => e.persisted && setBusy(false);
+    window.addEventListener("pageshow", reset);
+    return () => window.removeEventListener("pageshow", reset);
+  }, []);
 
   async function resetPassword(email: string) {
     if (!email) return setError("Enter your email first.");
@@ -46,20 +33,55 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-6 space-y-4">
-      <label className="block">
+    <form
+      method="post"
+      action="/auth/login"
+      onSubmit={(e) => {
+        if (busy) return e.preventDefault(); // no double submit
+        setError("");
+        setInfo("");
+        setBusy(true);
+      }}
+      className="mt-6 space-y-4"
+    >
+      <input type="hidden" name="next" value={next} />
+      <label className="block" htmlFor="login-email">
         <span className={labelClass}>Work email</span>
-        <input name="email" type="email" disabled={busy} required placeholder="you@amzcentric.com" autoComplete="email" className={inputClass} />
+        <input
+          id="login-email"
+          name="email"
+          type="email"
+          inputMode="email"
+          required
+          readOnly={busy}
+          defaultValue={initialEmail}
+          autoFocus={!initialEmail}
+          placeholder="you@amzcentric.com"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          className={inputClass}
+        />
       </label>
-      <label className="block">
+      <label className="block" htmlFor="login-password">
         <span className={labelClass}>Password</span>
-        <input name="password" type="password" disabled={busy} required placeholder="••••••••••" autoComplete="current-password" className={inputClass} />
+        <input
+          id="login-password"
+          name="password"
+          type="password"
+          required
+          readOnly={busy}
+          autoFocus={!!initialEmail}
+          placeholder="••••••••••"
+          autoComplete="current-password"
+          className={inputClass}
+        />
       </label>
       {error && <p className="text-xs font-semibold text-bad">{error}</p>}
       {info && <p className="text-xs font-semibold text-good">{info}</p>}
-      <button className={cn(buttonClass.primary, "h-12 w-full text-base")} disabled={busy}>
+      <button type="submit" className={cn(buttonClass.primary, "h-12 w-full text-base")} aria-disabled={busy}>
         {busy && <Loader2 className="size-4 animate-spin" strokeWidth={2} />}
-        {phase === "signing" ? "Signing in…" : phase === "opening" ? "Opening your dashboard…" : "Sign in"}
+        {busy ? "Signing in…" : "Sign in"}
       </button>
       <button
         type="button"

@@ -2,6 +2,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedEmail } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/safe-next";
 
 /**
  * Invite / recovery links: /auth/confirm?token_hash=...&type=invite&next=/account/set-password
@@ -11,8 +12,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const tokenHash = sp.get("token_hash");
   const type = sp.get("type") as EmailOtpType | null;
-  const nextParam = sp.get("next") ?? "/account/set-password";
-  const next = nextParam.startsWith("/") ? nextParam : "/dashboard";
+  const next = safeNext(sp.get("next") ?? "/account/set-password");
   if (!tokenHash || !type) return NextResponse.redirect(new URL("/login?error=Invalid+link", req.url));
 
   const supabase = await createClient();
