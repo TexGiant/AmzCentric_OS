@@ -2,11 +2,11 @@ import Link from "next/link";
 import { Card, CardHeader, Kpi, PageHeader, Segmented } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
 import { data, ACTION_CATEGORIES } from "@/lib/data";
-import { resolveRange, shortDate } from "@/lib/dates";
+import { shortDate } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
 import { acos, change, cpc, ctr, cvr, sum, type Totals } from "@/lib/metrics";
 import { salesDriver } from "@/lib/insights";
-import { getBrandOr404, param, type BrandParams, type SearchParams } from "@/lib/page";
+import { brandRange, getBrandOr404, param, type BrandParams, type SearchParams } from "@/lib/page";
 
 const ZERO: Totals = { impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0, units: 0 };
 const DRIVER_TONES = { Traffic: "info", Conversion: "warn", "Order value": "neutral", Paused: "bad", New: "good", Flat: "neutral" };
@@ -16,7 +16,7 @@ export default async function WhatChangedPage({ params, searchParams }: { params
   const sp = await searchParams;
   const brand = await getBrandOr404(slug);
   const days = [7, 14, 30].includes(Number(param(sp, "range"))) ? Number(param(sp, "range")) : 7;
-  const range = resolveRange(String(days));
+  const range = await brandRange(slug, String(days), 7);
 
   const ds = data();
   const [cNow, cPrev, pNow, pPrev, actions] = await Promise.all([
@@ -79,7 +79,7 @@ export default async function WhatChangedPage({ params, searchParams }: { params
       <PageHeader
         eyebrow="What changed"
         title="Why did sales move?"
-        subtitle={`${brand.name} · ${shortDate(range.from)}–${shortDate(range.to)} vs ${shortDate(range.prevFrom)}–${shortDate(range.prevTo)}`}
+        subtitle={`${brand.name} · ${shortDate(range.from)}–${shortDate(range.to)} vs ${shortDate(range.prevFrom)}–${shortDate(range.prevTo)}${range.pending ? ` · ${shortDate(range.pending)} report pending` : ""}`}
         right={
           <Segmented
             items={[7, 14, 30].map((d) => ({

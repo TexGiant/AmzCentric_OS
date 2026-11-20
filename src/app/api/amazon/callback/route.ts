@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { exchangeAuthCode, isRegion, listProfiles, type AdsAccount } from "@/lib/amazon/ads";
 import { encryptSecret } from "@/lib/crypto";
+import { importProfiles } from "@/lib/amazon/profiles";
 import { siteUrl } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -42,25 +43,8 @@ export async function GET(req: NextRequest) {
       .single();
     if (error) throw error;
 
-    if (profiles.length) {
-      // Re-connecting moves existing profiles to the new account but keeps brand/enabled settings.
-      const { error: pErr } = await db.from("amazon_profiles").upsert(
-        profiles.map((p) => ({
-          profile_id: String(p.profileId),
-          account_id: account.id,
-          country_code: p.countryCode,
-          currency_code: p.currencyCode,
-          timezone: p.timezone,
-          marketplace_id: p.accountInfo?.marketplaceStringId,
-          account_info_id: p.accountInfo?.id,
-          account_name: p.accountInfo?.name,
-          account_type: p.accountInfo?.type,
-          updated_at: new Date().toISOString(),
-        })),
-        { onConflict: "profile_id" },
-      );
-      if (pErr) throw pErr;
-    }
+    // Re-connecting moves existing profiles to the new account but keeps brand/enabled settings.
+    await importProfiles(account.id, profiles);
     return back(req, { connected: String(profiles.length) });
   } catch (err) {
     return back(req, { error: err instanceof Error ? err.message : String(err) });

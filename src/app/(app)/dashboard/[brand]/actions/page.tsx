@@ -3,11 +3,11 @@ import { Card, CardHeader, Kpi, PageHeader, Pill, cn } from "@/components/ui";
 import { ActionForm } from "@/components/forms";
 import { deleteAction } from "@/app/workspace-actions";
 import { data, ACTION_CATEGORIES } from "@/lib/data";
-import { addDays, shortDate, todayUtc } from "@/lib/dates";
+import { addDays, shortDate } from "@/lib/dates";
 import { IMPACT_WINDOW, measureActions } from "@/lib/action-impact";
 import { money, pct } from "@/lib/format";
 import { acos, change } from "@/lib/metrics";
-import { getBrandOr404, type BrandParams } from "@/lib/page";
+import { brandClock, getBrandOr404, type BrandParams } from "@/lib/page";
 
 const WINDOW = IMPACT_WINDOW;
 
@@ -15,8 +15,9 @@ export default async function ActionLogPage({ params }: { params: BrandParams })
   const { brand: slug } = await params;
   const brand = await getBrandOr404(slug);
   const ds = data();
-  const today = todayUtc();
-  const yesterday = addDays(today, -1);
+  const clock = await brandClock(slug);
+  const today = clock.today;
+  const yesterday = clock.through; // measure only over days whose reports have arrived
 
   const [actions, campaigns] = await Promise.all([
     ds.actions(slug, 100),

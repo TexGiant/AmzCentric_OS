@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import { PlugZap, Radio } from "lucide-react";
 import { Alert, Card, CardHeader, Empty, PageHeader, Pill, buttonClass, cn, inputClass, selectClass } from "@/components/ui";
-import { disconnectAccount, renameAccount, updateProfile } from "@/app/settings-actions";
+import { disconnectAccount, refreshProfiles, renameAccount, updateProfile } from "@/app/settings-actions";
+import { PendingButton } from "@/components/settings-forms";
 import { requireUser } from "@/lib/auth";
 import { REGIONS, type AdsAccount, type Region } from "@/lib/amazon/ads";
 import { AD_TYPES, StreamStatusCells } from "@/components/stream-status";
@@ -43,6 +44,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const error = param(sp, "error");
   const connected = param(sp, "connected");
   const streamOk = param(sp, "stream_ok");
+  const refreshed = param(sp, "refreshed");
   const streamError = param(sp, "stream_error");
   const destinations = streamDestinations();
   const enabledProfiles = accounts.flatMap((a) =>
@@ -74,6 +76,11 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
         </Alert>
       )}
 
+      {refreshed && (
+        <Alert tone="good" title="Profiles refreshed">
+          {refreshed}. New profiles start disabled: enable them and pick a brand below.
+        </Alert>
+      )}
       {streamOk && (
         <Alert tone="good" title="Marketing Stream">
           {streamOk}. Hourly data starts arriving within about an hour.
@@ -107,6 +114,12 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
                   <button className={cn(buttonClass.ghost, buttonClass.small)}>Rename</button>
                 </form>
                 <div className="flex items-center gap-2">
+                  <form action={refreshProfiles}>
+                    <input type="hidden" name="id" value={a.id} />
+                    <PendingButton pendingText="Refreshing…" className={cn(buttonClass.secondary, buttonClass.small)}>
+                      Refresh profiles
+                    </PendingButton>
+                  </form>
                   <Pill tone="brand">{REGIONS[a.region].label}</Pill>
                   <Pill tone={enabled ? "good" : "neutral"} dot>
                     {enabled} of {a.amazon_profiles.length} enabled

@@ -3,10 +3,10 @@ import { Card, CardHeader, Kpi, PageHeader, Progress, buttonClass, cn } from "@/
 import { Legend, PaceChart } from "@/components/charts";
 import { GoalForm } from "@/components/forms";
 import { data } from "@/lib/data";
-import { addDays, daysInMonth, eachDay, monthStart, todayUtc } from "@/lib/dates";
+import { addDays, daysInMonth, eachDay, monthStart } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
 import { acos, sum } from "@/lib/metrics";
-import { getBrandOr404, param, type BrandParams, type SearchParams } from "@/lib/page";
+import { brandClock, getBrandOr404, param, type BrandParams, type SearchParams } from "@/lib/page";
 
 function shiftMonth(month: string, n: number) {
   const d = new Date(`${month}T00:00:00Z`);
@@ -18,7 +18,8 @@ export default async function GoalsPage({ params, searchParams }: { params: Bran
   const { brand: slug } = await params;
   const sp = await searchParams;
   const brand = await getBrandOr404(slug);
-  const yesterday = addDays(todayUtc(), -1);
+  // Last day with report data, in the marketplace timezone.
+  const yesterday = (await brandClock(slug)).through;
   const current = monthStart(yesterday);
   const requested = param(sp, "month");
   const month = requested && /^\d{4}-\d{2}-01$/.test(requested) && requested <= current ? requested : current;

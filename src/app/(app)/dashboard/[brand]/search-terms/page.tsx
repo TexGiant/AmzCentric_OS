@@ -1,10 +1,9 @@
 import { Card, Kpi, PageHeader, RangeTabs, Tabs } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
-import { resolveRange } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
 import { acos, sum, withRatios } from "@/lib/metrics";
-import { getBrandOr404, param, type BrandParams, type SearchParams } from "@/lib/page";
+import { brandRange, getBrandOr404, param, rangeLabel, type BrandParams, type SearchParams } from "@/lib/page";
 
 const VIEWS = {
   all: { label: "All terms", test: () => true },
@@ -21,7 +20,7 @@ export default async function SearchTermsPage({ params, searchParams }: { params
   const { brand: slug } = await params;
   const sp = await searchParams;
   const brand = await getBrandOr404(slug);
-  const range = resolveRange(param(sp, "range"));
+  const range = await brandRange(slug, param(sp, "range"));
   const view = (param(sp, "view") ?? "all") as View;
   const active = VIEWS[view] ? view : "all";
 
@@ -36,7 +35,7 @@ export default async function SearchTermsPage({ params, searchParams }: { params
       <PageHeader
         eyebrow="Ads analytics"
         title="Search terms"
-        subtitle={`${brand.name} · Sponsored Products · ${range.from} → ${range.to}`}
+        subtitle={`${brand.name} · Sponsored Products · ${rangeLabel(range)}`}
         right={<RangeTabs basePath={base} current={range.days} extra={{ view: active }} />}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -83,7 +83,10 @@ export function buildMcpServer(user: McpUser) {
   async function clock(slug: string) {
     const status = await ds.brandStatus(slug);
     const today = todayInTz(status.timezone);
-    return { status, today, yesterday: addDays(today, -1) };
+    const yesterday = addDays(today, -1);
+    // Last day whose Amazon report has arrived: report-based ranges end here, like the dashboard.
+    const through = status.dataThrough && status.dataThrough < yesterday ? status.dataThrough : yesterday;
+    return { status, today, yesterday, through };
   }
 
   const run =
@@ -111,7 +114,7 @@ export function buildMcpServer(user: McpUser) {
       const brands = await ds.listBrands();
       return Promise.all(
         brands.map(async (b) => {
-          const { yesterday } = await clock(b.slug);
+          const { through: yesterday } = await clock(b.slug);
           const series = await ds.brandDaily(b.slug, addDays(yesterday, -13), yesterday);
           const now = sum(series.filter((d) => d.date > addDays(yesterday, -7)));
           const prev = sum(series.filter((d) => d.date <= addDays(yesterday, -7)));
@@ -193,7 +196,7 @@ export function buildMcpServer(user: McpUser) {
     },
     run(async (a: { brand: string; days?: number; ad_type?: "SP" | "SB" | "SD"; sort_by?: string; limit?: number }) => {
       const b = await brandOf(a.brand);
-      const { yesterday } = await clock(b.slug);
+      const { through: yesterday } = await clock(b.slug);
       const days = a.days ?? 30;
       const from = addDays(yesterday, -(days - 1));
       const [now, prev] = await Promise.all([
@@ -237,7 +240,7 @@ export function buildMcpServer(user: McpUser) {
     },
     run(async (a: { brand: string; days?: number; view?: string; contains?: string; limit?: number }) => {
       const b = await brandOf(a.brand);
-      const { yesterday } = await clock(b.slug);
+      const { through: yesterday } = await clock(b.slug);
       const from = addDays(yesterday, -((a.days ?? 30) - 1));
       const terms = await ds.searchTerms(b.slug, from, yesterday);
       const view = a.view ?? "all";
@@ -284,7 +287,7 @@ export function buildMcpServer(user: McpUser) {
     },
     run(async (a: { brand: string; days?: number }) => {
       const b = await brandOf(a.brand);
-      const { yesterday } = await clock(b.slug);
+      const { through: yesterday } = await clock(b.slug);
       const days = a.days ?? 30;
       const from = addDays(yesterday, -(days - 1));
       const [now, prev] = await Promise.all([ds.products(b.slug, from, yesterday), ds.products(b.slug, addDays(from, -days), addDays(from, -1))]);
@@ -355,7 +358,7 @@ export function buildMcpServer(user: McpUser) {
     },
     run(async (a: { brand: string; days?: number }) => {
       const b = await brandOf(a.brand);
-      const { yesterday } = await clock(b.slug);
+      const { through: yesterday } = await clock(b.slug);
       const days = a.days ?? 7;
       const from = addDays(yesterday, -(days - 1));
       const prevFrom = addDays(from, -days);
@@ -427,7 +430,7 @@ export function buildMcpServer(user: McpUser) {
     },
     run(async (a: { brand: string; limit?: number }) => {
       const b = await brandOf(a.brand);
-      const { yesterday } = await clock(b.slug);
+      const { through: yesterday } = await clock(b.slug);
       const actions = await ds.actions(b.slug, a.limit ?? 20);
       const measured = await measureActions(ds, b.slug, actions, yesterday);
       return {
@@ -467,7 +470,7 @@ export function buildMcpServer(user: McpUser) {
     },
     run(async (a: { brand: string; month?: string }) => {
       const b = await brandOf(a.brand);
-      const { yesterday } = await clock(b.slug);
+      const { through: yesterday } = await clock(b.slug);
       const month = a.month ? `${a.month}-01` : monthStart(yesterday);
       const dim = daysInMonth(month);
       const monthEnd = addDays(month, dim - 1);

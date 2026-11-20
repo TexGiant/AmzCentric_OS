@@ -1,16 +1,15 @@
 import { Card, Kpi, PageHeader, RangeTabs } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
-import { resolveRange } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
 import { acos, change, sum, withRatios } from "@/lib/metrics";
-import { getBrandOr404, param, type BrandParams, type SearchParams } from "@/lib/page";
+import { brandRange, getBrandOr404, param, rangeLabel, type BrandParams, type SearchParams } from "@/lib/page";
 
 export default async function ProductsPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
   const brand = await getBrandOr404(slug);
-  const range = resolveRange(param(sp, "range"));
+  const range = await brandRange(slug, param(sp, "range"));
   const [now, prev] = await Promise.all([
     data().products(slug, range.from, range.to),
     data().products(slug, range.prevFrom, range.prevTo),
@@ -24,7 +23,7 @@ export default async function ProductsPage({ params, searchParams }: { params: B
       <PageHeader
         eyebrow="Products & market"
         title="Product performance"
-        subtitle={`${brand.name} · advertised ASINs (Sponsored Products) · ${range.from} → ${range.to}`}
+        subtitle={`${brand.name} · advertised ASINs (Sponsored Products) · ${rangeLabel(range)}`}
         right={<RangeTabs basePath={`/dashboard/${slug}/products`} current={range.days} />}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

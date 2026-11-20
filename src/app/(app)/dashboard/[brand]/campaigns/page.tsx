@@ -1,16 +1,15 @@
 import { Card, Kpi, PageHeader, RangeTabs, Tabs } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
-import { resolveRange } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
 import { acos, change, cpc, ctr, cvr, roas, sum, withRatios } from "@/lib/metrics";
-import { getBrandOr404, param, type BrandParams, type SearchParams } from "@/lib/page";
+import { brandRange, getBrandOr404, param, rangeLabel, type BrandParams, type SearchParams } from "@/lib/page";
 
 export default async function CampaignsPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
   const brand = await getBrandOr404(slug);
-  const range = resolveRange(param(sp, "range"));
+  const range = await brandRange(slug, param(sp, "range"));
   const type = param(sp, "type") ?? "all";
 
   const [now, prev] = await Promise.all([
@@ -28,7 +27,7 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
       <PageHeader
         eyebrow="Ads analytics"
         title="Campaign manager"
-        subtitle={`${brand.name} · ${range.from} → ${range.to}`}
+        subtitle={`${brand.name} · ${rangeLabel(range)}`}
         right={<RangeTabs basePath={base} current={range.days} extra={{ type }} />}
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-7">

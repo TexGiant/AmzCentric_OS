@@ -63,10 +63,10 @@ export type Range = { days: number; from: string; to: string; prevFrom: string; 
 export const RANGE_OPTIONS = [7, 14, 30, 60, 90] as const;
 
 /** Range ending yesterday (reports are complete through yesterday). */
-export function resolveRange(raw: string | string[] | undefined, fallback = 30): Range {
+export function resolveRange(raw: string | string[] | undefined, fallback = 30, end?: string): Range {
   const n = Number(Array.isArray(raw) ? raw[0] : raw);
-  const days = (RANGE_OPTIONS as readonly number[]).includes(n) ? n : fallback;
-  const to = addDays(todayUtc(), -1);
+  const days = (RANGE_OPTIONS as readonly number[]).includes(n) || (end && Number.isInteger(n) && n > 0 && n <= 90) ? n : fallback;
+  const to = end ?? addDays(todayUtc(), -1);
   const from = addDays(to, -(days - 1));
   return { days, from, to, prevTo: addDays(from, -1), prevFrom: addDays(from, -days) };
 }

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { AdsAccount } from "@/lib/amazon/ads";
-import { AdsApiError } from "@/lib/amazon/ads";
+import { AdsApiError, listProfiles, isRegion } from "@/lib/amazon/ads";
+import { importProfiles } from "@/lib/amazon/profiles";
 import { createStreamSubscription, isLive, listStreamSubscriptions, STREAM_DATASETS } from "@/lib/amazon/stream";
 import { ingestStream, streamDestinations } from "@/lib/stream/sqs";
 import { requireAdmin, requireUser } from "@/lib/auth";
@@ -169,4 +170,28 @@ export async function subscribeStream(form: FormData) {
   revalidatePath("/settings/connections");
   if (failures.length) back({ stream_error: `${name}: created ${created}; failed ${failures.join(" | ")}` });
   back({ stream_ok: created > 0 ? `${name}: created ${created} subscription(s)` : `${name}: already subscribed` });
+}
+
+/** Re-read an Amazon account's advertising profiles (e.g. after access to a new brand was granted). */
+export async function refreshProfiles(form: FormData) {
+  await requireUser();
+  if (isDemoMode()) redirect("/settings/connections?error=demo");
+  const id = String(form.get("id") ?? "");
+  const db = createAdminClient();
+  const { data: row } = await db.from("amazon_accounts").select("id, region, refresh_token, name").eq("id", id).maybeSingle();
+  if (!row || !isRegion(row.region)) redirect("/settings/connections?error=Account+not+found");
+  let found = 0;
+  let added = 0;
+  try {
+    const profiles = await listProfiles({ id: row.id, region: row.region, refresh_token: row.refresh_token });
+    found = profiles.length;
+    added = await importProfiles(row.id, profiles);
+    await db.from("amazon_accounts").update({ last_error: null }).eq("id", id);
+  } catch (err) {
+    const msg = err instanceof AdsApiError ? `${err.status} ${err.body.slice(0, 200)}` : String(err).slice(0, 200);
+    await db.from("amazon_accounts").update({ last_error: `Refresh failed: ${msg}` }).eq("id", id);
+    redirect(`/settings/connections?error=${encodeURIComponent(`${row.name}: couldn't refresh profiles (${msg})`)}`);
+  }
+  revalidatePath("/", "layout");
+  redirect(`/settings/connections?${new URLSearchParams({ refreshed: `${row.name}: ${found} profiles found, ${added} new` })}`);
 }

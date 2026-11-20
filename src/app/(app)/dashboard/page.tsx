@@ -3,16 +3,20 @@ import { ArrowRight, Tags } from "lucide-react";
 import { Card, CardHeader, Delta, Empty, Eyebrow, Figure, NavyPanel, NavyStat, PageHeader, RangeTabs, buttonClass } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
-import { resolveRange } from "@/lib/dates";
+import { resolveRange, shortDate } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
 import { acos, change, sum, tacos } from "@/lib/metrics";
-import { param, type SearchParams } from "@/lib/page";
+import { brandClock, param, rangeLabel, type SearchParams } from "@/lib/page";
 
 export default async function AllBrandsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const range = resolveRange(param(sp, "range"));
   const ds = data();
   const brands = await ds.listBrands();
+  // One period for every brand: ends on the last day all brands have reports for.
+  const clocks = await Promise.all(brands.map((b) => brandClock(b.slug)));
+  const through = clocks.length ? clocks.map((c) => c.through).sort()[0] : undefined;
+  const latest = clocks.length ? clocks.map((c) => c.yesterday).sort().at(-1)! : null;
+  const range = { ...resolveRange(param(sp, "range"), 30, through), pending: latest && through && through < latest ? latest : null };
 
   if (!brands.length) {
     return (
@@ -48,7 +52,7 @@ export default async function AllBrandsPage({ searchParams }: { searchParams: Se
       <PageHeader
         eyebrow="Portfolio"
         title="All brands"
-        subtitle={`${brands.length} brands · last ${range.days} days vs the ${range.days} before`}
+        subtitle={`${brands.length} brands · ${rangeLabel(range)} vs the ${range.days} days before`}
         right={<RangeTabs basePath="/dashboard" current={range.days} />}
       />
 
