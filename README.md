@@ -4,10 +4,12 @@ Internal Amazon advertising analytics for AmzCentric. One login for the team, on
 
 - **Overview**: Today (live) / Yesterday / 7 / 14 / 30-day cards, a sales vs. spend trend with logged actions marked on it, and an "Attention required" list
 - **What Changed**: this week vs. last, with every campaign and ASIN mover tagged with its driver (traffic, conversion, order value, paused) and any logged action
-- **Campaigns / Search Terms / Products**: sortable, searchable, CSV export. Search terms have Wasted spend, Winners and Harvest views
+- **Campaigns / Search Terms / Products**: sortable, searchable, CSV export, 7–90 day presets or any custom from–to range (compared with the same number of days before it). Search terms have Wasted spend, Winners and Harvest views
 - **Hourly**: Marketing Stream spend and sales by hour against the 7-day average (for dayparting)
 - **Action Log**: record bids, budgets, negatives and listing changes. Each one is measured over 14 days before vs. after
 - **Goals**: monthly sales / spend / ACOS targets, pacing and month-end projection
+- **Meetings**: paste weekly client-call notes (or save them from Claude, or have a recorder push them). Claude writes a summary, insights tied to the brand's numbers, next week's agenda and tasks, and closes open tasks the call says are done
+- **Tasks**: per-brand task list with owners, due dates and priorities, plus **My Tasks** across every brand
 - **Settings**: Amazon OAuth connections (NA/EU/FE), brands, data sync (backfill and job queue), team invites
 
 The app runs on **demo data** until Supabase is configured, so you can click through everything first: `npm install && npm run dev`.
@@ -55,6 +57,7 @@ Marketing Stream ──SNS──► SQS ──(every 10 min)──► stream_tra
 | `/api/backfill`, `/api/poll`, `/api/stream-ingest` | session | Manual triggers (Data Sync page) |
 | `/api/cron/request-daily` · `poll-reports` · `stream-ingest` | `CRON_SECRET` bearer | Vercel Cron |
 | `/auth/callback`, `/auth/confirm`, `/account/set-password` | public | Login links and invites |
+| `/api/meetings/ingest` | `MEETINGS_INGEST_TOKEN` bearer | Recorder / Zapier pushes meeting notes |
 
 ---
 
@@ -124,7 +127,17 @@ Teammates can connect Claude (claude.ai, desktop, mobile, Claude Code) to AmzCen
 - Endpoint: `https://<your domain>/api/mcp` (MCP Streamable HTTP, stateless). `NEXT_PUBLIC_SITE_URL` must be the exact domain people use.
 - Sign-in: built-in OAuth 2.1 server, dynamic client registration, authorization code + PKCE (S256), refresh-token rotation with reuse detection. Each person approves with their own AmzCentric OS login; the same domain/team rules apply. Tokens are stored hashed (`supabase/migrations/0003_claude_connector_oauth.sql`).
 - Allowed redirect URIs: `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback`, `http://localhost:*` (Claude Code / MCP Inspector), plus any in `OAUTH_EXTRA_REDIRECT_URIS`.
-- Tools (`src/lib/mcp/server.ts`): `list_brands`, `get_brand_overview`, `get_what_changed`, `get_campaigns`, `get_search_terms`, `get_products`, `get_hourly`, `get_action_log`, `get_goals` (read-only) and `log_action` (writes to the Action Log as the signed-in user). Nothing can change Amazon.
+- Tools (`src/lib/mcp/server.ts`, `meeting-tools.ts`): `list_brands`, `get_brand_overview`, `get_what_changed`, `get_campaigns`, `get_search_terms`, `get_products`, `get_hourly`, `get_action_log`, `get_goals`, `list_meetings`, `get_meeting`, `list_tasks` (read-only); `log_action`, `save_meeting_notes`, `create_task`, `update_task` (write to the app as the signed-in user). Nothing can change Amazon.
+
+## Meetings & tasks
+
+Run `supabase/migrations/0005_meetings_tasks.sql` once. Notes reach a brand's **Meetings** tab three ways:
+
+1. **Paste** them on the Meetings tab.
+2. **From Claude** via the connector: *"Save this meeting to AmzCentric OS for Mr. Assist and create the tasks."* Claude sends the notes plus the summary, insights and tasks it extracted (`save_meeting_notes`).
+3. **From a recorder**: Zapier (or Make / n8n) POSTs to `/api/meetings/ingest` with `Authorization: Bearer $MEETINGS_INGEST_TOKEN` and JSON `{ title, notes | summary | transcript, date?, brand?, external_id? }`. The brand is matched from `brand` or the meeting title; `external_id` stops duplicates. Steps: **Settings → Meeting capture**.
+
+Pasted and pushed notes are analyzed with the Claude API (`src/lib/meetings/analyze.ts`, structured output) when `ANTHROPIC_API_KEY` is set: Claude gets the notes, the brand's last 7 vs. prior 7 days, top campaigns, goal pacing, recent Action Log entries, the team's emails and the brand's open tasks. It returns a summary, insights (win / risk / opportunity / decision / client request), tasks with owners and due dates, open tasks the call says are done, and next week's agenda. The analysis runs after the response (`after()`), and the meeting page refreshes itself until it's done. Without the key, notes are still saved and tasks can be added by hand or from Claude.
 
 ## Brand & design system
 
@@ -151,6 +164,6 @@ npm run build
 ## Roadmap
 
 - **SP-API** (in approval): Sales & Traffic report into `daily_analytics.total_sales/sessions` (enables real TACOS and total-sales goals), FBA/AWD inventory with days of cover, Search Query Performance
-- Weekly client report built from the numbers and the action log (print/PDF)
+- Weekly client report built from the numbers, the action log and the week's meeting (print/PDF)
 - Google SSO for `@amzcentric.com`
 - Budget-usage Stream dataset into an "out of budget" alert

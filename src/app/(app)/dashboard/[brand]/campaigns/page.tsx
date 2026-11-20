@@ -1,15 +1,17 @@
-import { Card, Kpi, PageHeader, RangeTabs, Tabs } from "@/components/ui";
+import { Card, Kpi, PageHeader, Tabs } from "@/components/ui";
+import { RangePicker } from "@/components/date-range";
+import { rangeParams } from "@/lib/dates";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
 import { money, pct } from "@/lib/format";
 import { acos, change, cpc, ctr, cvr, roas, sum, withRatios } from "@/lib/metrics";
-import { brandRange, getBrandOr404, param, rangeLabel, type BrandParams, type SearchParams } from "@/lib/page";
+import { brandRange, customParams, getBrandOr404, param, rangeLabel, type BrandParams, type SearchParams } from "@/lib/page";
 
 export default async function CampaignsPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
   const brand = await getBrandOr404(slug);
-  const range = await brandRange(slug, param(sp, "range"));
+  const range = await brandRange(slug, param(sp, "range"), 30, customParams(sp));
   const type = param(sp, "type") ?? "all";
 
   const [now, prev] = await Promise.all([
@@ -28,7 +30,7 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
         eyebrow="Ads analytics"
         title="Campaign manager"
         subtitle={`${brand.name} · ${rangeLabel(range)}`}
-        right={<RangeTabs basePath={base} current={range.days} extra={{ type }} />}
+        right={<RangePicker basePath={base} range={range} maxDate={range.through} extra={{ type }} />}
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-7">
         <Kpi size="sm" label="Spend" value={money(t.cost)} delta={change(t.cost, tp.cost)} invert />
@@ -42,7 +44,7 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
       <Card className="mt-6">
         <Tabs
           items={["all", "SP", "SB", "SD"].map((k) => ({
-            href: `${base}?range=${range.days}&type=${k}`,
+            href: `${base}?${new URLSearchParams({ ...rangeParams(range), type: k })}`,
             label: k === "all" ? "All" : k === "SP" ? "Sponsored Products" : k === "SB" ? "Sponsored Brands" : "Sponsored Display",
             active: type === k,
             count: k === "all" ? now.length : now.filter((c) => c.adProduct === k).length,

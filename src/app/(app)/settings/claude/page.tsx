@@ -17,6 +17,10 @@ const TOOLS: Array<[string, string]> = [
   ["get_action_log", "Logged changes with measured impact"],
   ["get_goals", "Monthly targets and pacing"],
   ["log_action", "Add an entry to the Action Log, as you"],
+  ["save_meeting_notes", "Save a brand meeting with its summary, insights and tasks"],
+  ["list_meetings / get_meeting", "Past meetings, summaries and agendas"],
+  ["list_tasks", "Open tasks for a brand, for you, or overdue"],
+  ["create_task / update_task", "Add tasks, reassign, mark done"],
 ];
 
 const fmt = (iso: string | null) =>

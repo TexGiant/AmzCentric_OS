@@ -1,9 +1,11 @@
-import { Card, Kpi, PageHeader, RangeTabs, Tabs } from "@/components/ui";
+import { Card, Kpi, PageHeader, Tabs } from "@/components/ui";
+import { RangePicker } from "@/components/date-range";
+import { rangeParams } from "@/lib/dates";
 import { DataTable } from "@/components/data-table";
 import { data } from "@/lib/data";
 import { money, pct } from "@/lib/format";
 import { acos, sum, withRatios } from "@/lib/metrics";
-import { brandRange, getBrandOr404, param, rangeLabel, type BrandParams, type SearchParams } from "@/lib/page";
+import { brandRange, customParams, getBrandOr404, param, rangeLabel, type BrandParams, type SearchParams } from "@/lib/page";
 
 const VIEWS = {
   all: { label: "All terms", test: () => true },
@@ -20,7 +22,7 @@ export default async function SearchTermsPage({ params, searchParams }: { params
   const { brand: slug } = await params;
   const sp = await searchParams;
   const brand = await getBrandOr404(slug);
-  const range = await brandRange(slug, param(sp, "range"));
+  const range = await brandRange(slug, param(sp, "range"), 30, customParams(sp));
   const view = (param(sp, "view") ?? "all") as View;
   const active = VIEWS[view] ? view : "all";
 
@@ -36,7 +38,7 @@ export default async function SearchTermsPage({ params, searchParams }: { params
         eyebrow="Ads analytics"
         title="Search terms"
         subtitle={`${brand.name} · Sponsored Products · ${rangeLabel(range)}`}
-        right={<RangeTabs basePath={base} current={range.days} extra={{ view: active }} />}
+        right={<RangePicker basePath={base} range={range} maxDate={range.through} extra={{ view: active }} />}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Search terms" value={terms.length.toLocaleString()} />
@@ -47,7 +49,7 @@ export default async function SearchTermsPage({ params, searchParams }: { params
       <Card className="mt-6">
         <Tabs
           items={(Object.keys(VIEWS) as View[]).map((k) => ({
-            href: `${base}?range=${range.days}&view=${k}`,
+            href: `${base}?${new URLSearchParams({ ...rangeParams(range), view: k })}`,
             label: VIEWS[k].label,
             active: active === k,
             count: terms.filter((r) => (VIEWS[k].test as (r: (typeof terms)[number]) => boolean)(r)).length,

@@ -11,6 +11,7 @@ import { attentionItems, salesDriver } from "@/lib/insights";
 import { acos, change, cpc, ctr, cvr, roas, sum, type Totals } from "@/lib/metrics";
 import type { McpUser } from "@/lib/oauth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { registerMeetingTools } from "@/lib/mcp/meeting-tools";
 
 /*
  * The AmzCentric OS MCP server: read tools over every brand's data + log_action.
@@ -24,6 +25,7 @@ const INSTRUCTIONS = `AmzCentric OS holds Amazon Advertising data (Sponsored Pro
 - Dates are in the marketplace timezone (Pacific for US). Sales use Amazon's attribution: 7-day for Sponsored Products, 14-day for Sponsored Brands and Display.
 - Total sales and TACOS are not available yet (they need SP-API); sales here are ad-attributed.
 - log_action writes to the team's Action Log under the signed-in user's name. Only call it for a change that was actually made (or is being made) in Amazon, one change per entry, with numbers in the description (e.g. "Raised exact bids +15% on top 5 keywords"). Confirm with the user before logging if they haven't explicitly asked you to log it.
+- Meetings & tasks: after a weekly brand call, save_meeting_notes stores the notes on the brand's Meetings tab. Pass the summary, insights and tasks you extracted (call list_tasks first so you don't duplicate open tasks, and pass completed_task_ids for tasks the call says are finished). list_tasks / create_task / update_task manage the team's to-dos; owner "me" is the signed-in teammate.
 - This connector cannot change anything in Amazon itself.`;
 
 const r2 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 100) / 100);
@@ -547,6 +549,16 @@ export function buildMcpServer(user: McpUser) {
       return { saved: true, id: data.id, ...entry, note: "Logged. Impact appears in get_action_log after 3 days and is final after 14." };
     }),
   );
+
+  registerMeetingTools(server, {
+    user,
+    brandOf,
+    today: async (slug) => (slug ? (await clock(slug)).today : todayInTz("America/Los_Angeles")),
+    run,
+    fail: (message: string) => {
+      throw new ToolError(message);
+    },
+  });
 
   return server;
 }

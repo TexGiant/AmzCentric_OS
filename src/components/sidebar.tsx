@@ -15,6 +15,9 @@ import {
   GitCompareArrows,
   LayoutGrid,
   ListChecks,
+  ListTodo,
+  MessagesSquare,
+  NotebookPen,
   LogOut,
   Megaphone,
   Menu,
@@ -82,7 +85,14 @@ export function Sidebar({
             { href: `/dashboard/${slug}/inventory`, label: "Inventory", icon: Boxes, soon: "SP-API" },
           ],
         },
-        { label: "Work", items: [{ href: `/dashboard/${slug}/actions`, label: "Action Log", icon: ListChecks }] },
+        {
+          label: "Work",
+          items: [
+            { href: `/dashboard/${slug}/meetings`, label: "Meetings", icon: MessagesSquare },
+            { href: `/dashboard/${slug}/tasks`, label: "Tasks", icon: ListTodo },
+            { href: `/dashboard/${slug}/actions`, label: "Action Log", icon: ListChecks },
+          ],
+        },
       ]
     : [];
 
@@ -91,6 +101,7 @@ export function Sidebar({
     { href: "/settings/brands", label: "Brands", icon: Tags },
     { href: "/settings/sync", label: "Data Sync", icon: Database },
     { href: "/settings/claude", label: "Claude connector", icon: Bot },
+    { href: "/settings/meetings", label: "Meeting capture", icon: NotebookPen },
     ...(isAdmin ? [{ href: "/settings/team", label: "Team", icon: Users }] : []),
   ];
 
@@ -147,6 +158,7 @@ export function Sidebar({
       <nav className="mt-5 flex-1 space-y-5 overflow-y-auto px-4 pb-6">
         <div>
           <NavItem href="/dashboard" label="All Brands" icon={BarChart3} active={pathname === "/dashboard"} />
+          <NavItem href="/tasks" label="My Tasks" icon={ListTodo} active={pathname === "/tasks"} />
         </div>
         {groups.map((g) => (
           <Section key={g.label} label={g.label}>

@@ -58,7 +58,30 @@ export function chunkRange(from: string, to: string, maxDays: number): Array<[st
   return out;
 }
 
-export type Range = { days: number; from: string; to: string; prevFrom: string; prevTo: string };
+export type Range = { days: number; from: string; to: string; prevFrom: string; prevTo: string; custom?: boolean };
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+export const MAX_CUSTOM_DAYS = 366;
+
+/**
+ * A from/to range picked by hand, compared against the same number of days just before it.
+ * `to` is capped at `maxTo` (the last reported day). Returns null when the dates are unusable.
+ */
+export function customRange(from: string | undefined, to: string | undefined, maxTo: string): Range | null {
+  if (!from || !YMD.test(from) || Number.isNaN(Date.parse(from))) return null;
+  let end = to && YMD.test(to) && !Number.isNaN(Date.parse(to)) ? to : maxTo;
+  if (end > maxTo) end = maxTo;
+  if (from > end) return null;
+  let start = from;
+  if (daysBetween(start, end) + 1 > MAX_CUSTOM_DAYS) start = addDays(end, -(MAX_CUSTOM_DAYS - 1));
+  const days = daysBetween(start, end) + 1;
+  return { days, from: start, to: end, prevTo: addDays(start, -1), prevFrom: addDays(start, -days), custom: true };
+}
+
+/** Query-string params that reproduce a range (preset days or custom from/to). */
+export function rangeParams(r: Range): Record<string, string> {
+  return r.custom ? { from: r.from, to: r.to } : { range: String(r.days) };
+}
 
 export const RANGE_OPTIONS = [7, 14, 30, 60, 90] as const;
 
