@@ -29,12 +29,15 @@ export function RangePicker({
   range,
   maxDate,
   extra,
+  presets,
 }: {
   basePath: string;
   range: { days: number; from: string; to: string; custom?: boolean };
   /** Last day with a complete Amazon report. */
   maxDate: string;
   extra?: Record<string, string>;
+  /** Replaces the 7D–90D buttons (e.g. 4W / 12W on the Reports tab). */
+  presets?: Array<{ label: string; href: string; active: boolean }>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -90,13 +93,16 @@ export function RangePicker({
   return (
     <div ref={box} className="relative flex flex-wrap items-center gap-2">
       <div className={segmentedClass}>
-        {PRESETS.map((d) => (
-          <Link
-            key={d}
-            href={`${basePath}?${new URLSearchParams({ ...extra, range: String(d) })}`}
-            className={segmentedItemClass(!range.custom && range.days === d)}
-          >
-            <LinkPulse>{`${d}D`}</LinkPulse>
+        {(
+          presets ??
+          PRESETS.map((d) => ({
+            label: `${d}D`,
+            href: `${basePath}?${new URLSearchParams({ ...extra, range: String(d) })}`,
+            active: !range.custom && range.days === d,
+          }))
+        ).map((p) => (
+          <Link key={p.href} href={p.href} className={segmentedItemClass(!range.custom && p.active)}>
+            <LinkPulse>{p.label}</LinkPulse>
           </Link>
         ))}
         <button

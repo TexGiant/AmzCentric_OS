@@ -97,6 +97,7 @@ export function makeSupabaseSource(getDb: GetDb): DataSource {
       date: String(r.date),
       ...totals(r),
       totalSales: r.total_sales == null ? null : n(r.total_sales),
+      totalOrders: r.total_orders == null ? null : n(r.total_orders),
     }));
   },
 

@@ -15,6 +15,12 @@ export type Column = {
   /** Render values as .amz-badge — maps value → tone (good | bad | warn | brand | info | neutral). */
   badge?: Record<string, string>;
   badgeDot?: boolean;
+  /** Small tag under the header label, e.g. the data source ("SP-API"). */
+  tag?: string;
+  /** Sort by another field (e.g. an ISO date behind a display label). */
+  sortKey?: string;
+  /** Keep the cell on one line (dates, short labels). */
+  nowrap?: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -28,6 +34,7 @@ export function DataTable({
   pageSize = 50,
   exportName,
   empty = "No data for this period.",
+  footer,
 }: {
   columns: Column[];
   rows: Row[];
@@ -36,6 +43,8 @@ export function DataTable({
   pageSize?: number;
   exportName?: string;
   empty?: string;
+  /** A totals row pinned under the rows (not sorted, included in CSV). */
+  footer?: Row;
 }) {
   const [sort, setSort] = useState(defaultSort ?? { key: columns[0].key, dir: "desc" as const });
   const [q, setQ] = useState("");
@@ -45,8 +54,9 @@ export function DataTable({
     const needle = q.trim().toLowerCase();
     const base = needle && searchKeys ? rows.filter((r) => searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(needle))) : rows;
     const sorted = [...base].sort((a, b) => {
-      const av = a[sort.key];
-      const bv = b[sort.key];
+      const sk = columns.find((c) => c.key === sort.key)?.sortKey ?? sort.key;
+      const av = a[sk];
+      const bv = b[sk];
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
       if (bv == null) return -1;
@@ -54,14 +64,14 @@ export function DataTable({
       return sort.dir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [rows, q, sort, searchKeys]);
+  }, [rows, q, sort, searchKeys, columns]);
 
   const toggle = (key: string) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
 
   const exportCsv = () => {
     const esc = (v: unknown) => `"${String(v ?? "").replaceAll('"', '""')}"`;
-    const csv = [columns.map((c) => esc(c.label)).join(","), ...filtered.map((r) => columns.map((c) => esc(r[c.key])).join(","))].join("\n");
+    const csv = [columns.map((c) => esc(c.label)).join(","), ...[...filtered, ...(footer ? [footer] : [])].map((r) => columns.map((c) => esc(r[c.key])).join(","))].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const a = document.createElement("a");
     a.href = url;
@@ -115,7 +125,14 @@ export function DataTable({
                     )}
                   >
                     <button onClick={() => toggle(c.key)} className={cn("inline-flex items-center gap-1 hover:text-ink", numeric && "flex-row-reverse")}>
-                      {c.label}
+                      {c.tag ? (
+                        <span className={cn("flex flex-col gap-1", numeric ? "items-end" : "items-start")}>
+                          {c.label}
+                          <span className="rounded-pill bg-[#f1f5f9] px-1.5 py-px text-[9px] font-bold tracking-[0.08em] text-faint">{c.tag}</span>
+                        </span>
+                      ) : (
+                        c.label
+                      )}
                       {sort.key === c.key &&
                         (sort.dir === "asc" ? <ArrowUp className="size-3" strokeWidth={2} /> : <ArrowDown className="size-3" strokeWidth={2} />)}
                     </button>
@@ -141,6 +158,7 @@ export function DataTable({
                       className={cn(
                         "px-4 py-3.5 align-middle",
                         numeric ? "text-right whitespace-nowrap tabular" : "text-left",
+                        c.nowrap && "whitespace-nowrap",
                         i === 0 && "pl-6 font-semibold text-ink",
                         i === columns.length - 1 && "pr-6",
                         tone || (i === 0 ? "" : "text-ink-2"),
@@ -160,6 +178,23 @@ export function DataTable({
               </tr>
             ))}
           </tbody>
+          {footer && filtered.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 border-line-strong bg-canvas font-bold text-ink">
+                {columns.map((c, i) => {
+                  const numeric = c.format && c.format !== "text";
+                  return (
+                    <td
+                      key={c.key}
+                      className={cn("px-4 py-3.5", numeric ? "text-right whitespace-nowrap tabular" : "text-left", c.nowrap && "whitespace-nowrap", i === 0 && "pl-6", i === columns.length - 1 && "pr-6")}
+                    >
+                      {c.badge ? "" : formatValue(c.format ?? "text", footer[c.key])}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
       {filtered.length === 0 && <div className="px-6 py-12 text-center text-sm text-muted">{empty}</div>}

@@ -12,6 +12,7 @@ import { acos, change, cpc, ctr, cvr, roas, sum, type Totals } from "@/lib/metri
 import type { McpUser } from "@/lib/oauth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registerMeetingTools } from "@/lib/mcp/meeting-tools";
+import { DEFAULT_WEEK_START, WEEKDAYS, buckets, buildReport, reportWindow, type Period } from "@/lib/report";
 
 /*
  * The AmzCentric OS MCP server: read tools over every brand's data + log_action.
@@ -458,6 +459,56 @@ export function buildMcpServer(user: McpUser) {
             },
           };
         }),
+      };
+    }),
+  );
+
+  server.registerTool(
+    "get_report",
+    {
+      title: "Daily / weekly / monthly report",
+      description:
+        "The team's reporting sheet for a brand, one row per day, week or month: total orders, PPC orders, organic orders, total sales, PPC sales, PPC spend, clicks, organic ratio, PPC ratio, TACOS, ACOS, avg CPC, PPC CVR, plus a total. Total orders / total sales and everything derived from them are null until SP-API is connected. The newest period can be partial.",
+      inputSchema: {
+        brand: brandArg,
+        period: z.enum(["daily", "weekly", "monthly"]).optional().describe("Default weekly"),
+        count: z.number().int().min(1).max(104).optional().describe("How many periods ending with the latest (default 30 days / 12 weeks / 6 months)"),
+        week_start: z.enum(["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]).optional().describe("Default monday"),
+      },
+      annotations: READ,
+    },
+    run(async (a: { brand: string; period?: Period; count?: number; week_start?: string }) => {
+      const b = await brandOf(a.brand);
+      const { through: yesterday } = await clock(b.slug);
+      const period = a.period ?? "weekly";
+      const ws = a.week_start ? WEEKDAYS.findIndex((d) => d.toLowerCase() === a.week_start) : DEFAULT_WEEK_START;
+      const count = a.count ?? (period === "daily" ? 30 : period === "weekly" ? 12 : 6);
+      const win = reportWindow(period, count, yesterday, ws);
+      const daily = await ds.brandDaily(b.slug, win.from, win.to);
+      const rep = buildReport(period, daily, buckets(period, win.from, win.to, ws), yesterday);
+      const out = (m: ReturnType<typeof buildReport>["total"]) => ({
+        total_orders: m.totalOrders,
+        ppc_orders: m.ppcOrders,
+        organic_orders: m.organicOrders,
+        total_sales: r2(m.totalSales),
+        ppc_sales: r2(m.ppcSales),
+        ppc_spend: r2(m.ppcSpend),
+        clicks: m.clicks,
+        organic_ratio_pct: p2(m.organicRatio),
+        ppc_ratio_pct: p2(m.ppcRatio),
+        tacos_pct: p2(m.tacos),
+        acos_pct: p2(m.acos),
+        avg_cpc: r2(m.cpc),
+        ppc_cvr_pct: p2(m.cvr),
+      });
+      return {
+        brand: b.name,
+        period,
+        week_starts: period === "weekly" ? WEEKDAYS[ws] : undefined,
+        data_through: yesterday,
+        sp_api_connected: rep.total.totalSales != null,
+        rows: rep.rows.map((r) => ({ period: r.label, start: r.start, end: r.end, partial: r.partial, ...out(r) })),
+        total: out(rep.total),
       };
     }),
   );

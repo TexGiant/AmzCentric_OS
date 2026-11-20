@@ -16,6 +16,7 @@ const TOOLS: Array<[string, string]> = [
   ["get_hourly", "Hour-by-hour funnel for any day"],
   ["get_action_log", "Logged changes with measured impact"],
   ["get_goals", "Monthly targets and pacing"],
+  ["get_report", "Daily / weekly / monthly reporting sheet"],
   ["log_action", "Add an entry to the Action Log, as you"],
   ["save_meeting_notes", "Save a brand meeting with its summary, insights and tasks"],
   ["list_meetings / get_meeting", "Past meetings, summaries and agendas"],

@@ -16,6 +16,7 @@ import {
   LayoutGrid,
   ListChecks,
   ListTodo,
+  FileSpreadsheet,
   MessagesSquare,
   NotebookPen,
   LogOut,
@@ -66,6 +67,7 @@ export function Sidebar({
           label: "Workspace",
           items: [
             { href: `/dashboard/${slug}`, label: "Overview", icon: LayoutGrid, exact: true },
+            { href: `/dashboard/${slug}/reports`, label: "Reports", icon: FileSpreadsheet },
             { href: `/dashboard/${slug}/what-changed`, label: "What Changed", icon: GitCompareArrows },
             { href: `/dashboard/${slug}/goals`, label: "Goals", icon: Target },
           ],

@@ -185,7 +185,8 @@ export const demoSource: DataSource = {
     if (!b) return [];
     return eachDay(from, to).map((date): DailyPoint => {
       const t = sum(b.campaigns.map((c) => campaignDay(b, c, date)));
-      return { date, ...t, totalSales: t.sales * between(`${slug}:${date}:org`, 2.0, 2.5) };
+      const lift = between(`${slug}:${date}:org`, 2.0, 2.5);
+      return { date, ...t, totalSales: t.sales * lift, totalOrders: Math.round(t.orders * (lift * 0.62)) };
     });
   },
 

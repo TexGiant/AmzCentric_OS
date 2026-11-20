@@ -6,13 +6,16 @@ export type Totals = {
   orders: number;
   units: number;
   totalSales?: number | null;
+  /** SP-API (all orders, ads + organic). Null until Seller Central is connected. */
+  totalOrders?: number | null;
 };
 
-export const ZERO: Totals = { impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0, units: 0, totalSales: null };
+export const ZERO: Totals = { impressions: 0, clicks: 0, cost: 0, sales: 0, orders: 0, units: 0, totalSales: null, totalOrders: null };
 
 export function sum<T extends Partial<Totals>>(rows: T[]): Totals {
   const t: Totals = { ...ZERO };
   let total: number | null = null;
+  let totalOrders: number | null = null;
   for (const r of rows) {
     t.impressions += Number(r.impressions ?? 0);
     t.clicks += Number(r.clicks ?? 0);
@@ -21,8 +24,10 @@ export function sum<T extends Partial<Totals>>(rows: T[]): Totals {
     t.orders += Number(r.orders ?? 0);
     t.units += Number(r.units ?? 0);
     if (r.totalSales != null) total = (total ?? 0) + Number(r.totalSales);
+    if (r.totalOrders != null) totalOrders = (totalOrders ?? 0) + Number(r.totalOrders);
   }
   t.totalSales = total;
+  t.totalOrders = totalOrders;
   return t;
 }
 

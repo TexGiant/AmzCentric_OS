@@ -3,6 +3,7 @@
 Internal Amazon advertising analytics for AmzCentric. One login for the team, one workspace per client brand, with data pulled from the Amazon Ads API (daily reports) and Amazon Marketing Stream (hourly, through SQS) automatically.
 
 - **Overview**: Today (live) / Yesterday / 7 / 14 / 30-day cards, a sales vs. spend trend with logged actions marked on it, and an "Attention required" list
+- **Reports**: the team's reporting sheet by day, week (any start day) or month, with a totals row, chart, CSV export and custom ranges. Total orders / total sales and the ratios built on them (organic orders, organic & PPC ratio, TACOS) are tagged SP-API and stay empty until Seller Central is connected (`daily_analytics.total_orders` / `total_sales`, migration 0006)
 - **What Changed**: this week vs. last, with every campaign and ASIN mover tagged with its driver (traffic, conversion, order value, paused) and any logged action
 - **Campaigns / Search Terms / Products**: sortable, searchable, CSV export, 7–90 day presets or any custom from–to range (compared with the same number of days before it). Search terms have Wasted spend, Winners and Harvest views
 - **Hourly**: Marketing Stream spend and sales by hour against the 7-day average (for dayparting)
@@ -127,7 +128,7 @@ Teammates can connect Claude (claude.ai, desktop, mobile, Claude Code) to AmzCen
 - Endpoint: `https://<your domain>/api/mcp` (MCP Streamable HTTP, stateless). `NEXT_PUBLIC_SITE_URL` must be the exact domain people use.
 - Sign-in: built-in OAuth 2.1 server, dynamic client registration, authorization code + PKCE (S256), refresh-token rotation with reuse detection. Each person approves with their own AmzCentric OS login; the same domain/team rules apply. Tokens are stored hashed (`supabase/migrations/0003_claude_connector_oauth.sql`).
 - Allowed redirect URIs: `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback`, `http://localhost:*` (Claude Code / MCP Inspector), plus any in `OAUTH_EXTRA_REDIRECT_URIS`.
-- Tools (`src/lib/mcp/server.ts`, `meeting-tools.ts`): `list_brands`, `get_brand_overview`, `get_what_changed`, `get_campaigns`, `get_search_terms`, `get_products`, `get_hourly`, `get_action_log`, `get_goals`, `list_meetings`, `get_meeting`, `list_tasks` (read-only); `log_action`, `save_meeting_notes`, `create_task`, `update_task` (write to the app as the signed-in user). Nothing can change Amazon.
+- Tools (`src/lib/mcp/server.ts`, `meeting-tools.ts`): `list_brands`, `get_brand_overview`, `get_what_changed`, `get_campaigns`, `get_search_terms`, `get_products`, `get_hourly`, `get_action_log`, `get_goals`, `get_report`, `list_meetings`, `get_meeting`, `list_tasks` (read-only); `log_action`, `save_meeting_notes`, `create_task`, `update_task` (write to the app as the signed-in user). Nothing can change Amazon.
 
 ## Meetings & tasks
 
