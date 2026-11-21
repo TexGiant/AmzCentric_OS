@@ -7,8 +7,9 @@ import { AdsApiError, listProfiles, isRegion } from "@/lib/amazon/ads";
 import { importProfiles } from "@/lib/amazon/profiles";
 import { createStreamSubscription, isLive, listStreamSubscriptions, STREAM_DATASETS } from "@/lib/amazon/stream";
 import { ingestStream, streamDestinations } from "@/lib/stream/sqs";
-import { requireAdmin, requireUser } from "@/lib/auth";
-import { isAllowedEmail, isDemoMode, siteUrl } from "@/lib/env";
+import { requireAdminAccess } from "@/lib/access";
+import { audit } from "@/lib/audit";
+import { isDemoMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FormState } from "@/app/workspace-actions";
 
@@ -25,36 +26,39 @@ function slugify(s: string) {
 
 // ── Brands ────────────────────────────────────────────────────────────
 export async function createBrand(_: FormState, form: FormData): Promise<FormState> {
-  await requireUser();
+  const me = await requireAdminAccess();
   if (isDemoMode()) return DEMO;
   const name = String(form.get("name") ?? "").trim();
   const slug = slugify(String(form.get("slug") || name));
   if (!name || !slug) return { error: "Enter a brand name." };
   const { error } = await createAdminClient().from("brands").insert({ slug, name });
   if (error) return { error: error.code === "23505" ? "A brand with that slug already exists." : error.message };
+  await audit({ action: "brand.create", actor: me, brand: slug, detail: { name } });
   revalidatePath("/", "layout");
   return { ok: true, message: `Created ${name}.` };
 }
 
 export async function renameBrand(form: FormData) {
-  await requireUser();
+  const me = await requireAdminAccess();
   if (isDemoMode()) return;
   const slug = String(form.get("slug"));
   const name = String(form.get("name") ?? "").trim();
   if (name) await createAdminClient().from("brands").update({ name }).eq("slug", slug);
+  if (name) await audit({ action: "brand.rename", actor: me, brand: slug, detail: { name } });
   revalidatePath("/", "layout");
 }
 
 export async function deleteBrand(form: FormData) {
-  await requireAdmin();
+  const me = await requireAdminAccess();
   if (isDemoMode()) return;
   await createAdminClient().from("brands").delete().eq("slug", String(form.get("slug")));
+  await audit({ action: "brand.delete", actor: me, brand: String(form.get("slug")) });
   revalidatePath("/", "layout");
 }
 
 // ── Amazon connections ────────────────────────────────────────────────
 export async function updateProfile(form: FormData) {
-  await requireUser();
+  const me = await requireAdminAccess();
   if (isDemoMode()) return;
   const brand = String(form.get("brand_slug") ?? "");
   await createAdminClient()
@@ -66,11 +70,12 @@ export async function updateProfile(form: FormData) {
       updated_at: new Date().toISOString(),
     })
     .eq("profile_id", String(form.get("profile_id")));
+  await audit({ action: "profile.update", actor: me, brand: brand || null, target: String(form.get("profile_id")), detail: { enabled: form.get("enabled") === "on" } });
   revalidatePath("/", "layout");
 }
 
 export async function renameAccount(form: FormData) {
-  await requireUser();
+  const me = await requireAdminAccess();
   if (isDemoMode()) return;
   const name = String(form.get("name") ?? "").trim();
   if (name) await createAdminClient().from("amazon_accounts").update({ name }).eq("id", String(form.get("id")));
@@ -78,54 +83,17 @@ export async function renameAccount(form: FormData) {
 }
 
 export async function disconnectAccount(form: FormData) {
-  await requireAdmin();
+  const me = await requireAdminAccess();
   if (isDemoMode()) return;
   await createAdminClient().from("amazon_accounts").delete().eq("id", String(form.get("id")));
+  await audit({ action: "amazon.disconnect", actor: me, target: String(form.get("id")) });
   revalidatePath("/", "layout");
-}
-
-// ── Team ──────────────────────────────────────────────────────────────
-export async function inviteMember(_: FormState, form: FormData): Promise<FormState> {
-  await requireAdmin();
-  if (isDemoMode()) return DEMO;
-  const email = String(form.get("email") ?? "").trim().toLowerCase();
-  const role = form.get("role") === "admin" ? "admin" : "member";
-  if (!isAllowedEmail(email)) return { error: "That email domain isn't allowed (see ALLOWED_EMAIL_DOMAINS)." };
-  const db = createAdminClient();
-  const { data, error } = await db.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${siteUrl()}/auth/callback?next=/account/set-password`,
-  });
-  if (error) return { error: error.message };
-  await db.from("app_users").upsert({ user_id: data.user.id, email, role });
-  revalidatePath("/settings/team");
-  return { ok: true, message: `Invite sent to ${email}.` };
-}
-
-export async function setRole(form: FormData) {
-  const me = await requireAdmin();
-  if (isDemoMode()) return;
-  const id = String(form.get("user_id"));
-  if (id === me.id) return;
-  await createAdminClient()
-    .from("app_users")
-    .update({ role: form.get("role") === "admin" ? "admin" : "member" })
-    .eq("user_id", id);
-  revalidatePath("/settings/team");
-}
-
-export async function removeMember(form: FormData) {
-  const me = await requireAdmin();
-  if (isDemoMode()) return;
-  const id = String(form.get("user_id"));
-  if (id === me.id) return;
-  await createAdminClient().auth.admin.deleteUser(id);
-  revalidatePath("/settings/team");
 }
 
 // ── Marketing Stream subscriptions ───────────────────────────────────
 /** Create any missing sp-traffic / sp-conversion subscriptions for one profile, then confirm them. */
 export async function subscribeStream(form: FormData) {
-  await requireUser();
+  const me = await requireAdminAccess();
   if (isDemoMode()) redirect("/settings/connections?error=demo");
   const profileId = String(form.get("profile_id") ?? "");
   const back = (params: Record<string, string>) => redirect(`/settings/connections?${new URLSearchParams(params)}#stream`);
@@ -167,6 +135,7 @@ export async function subscribeStream(form: FormData) {
     await new Promise((r) => setTimeout(r, 6000));
     await ingestStream(Date.now() + 25_000).catch(() => undefined);
   }
+  await audit({ action: "stream.subscribe", actor: me, target: profileId, detail: { created, failures: failures.length } });
   revalidatePath("/settings/connections");
   if (failures.length) back({ stream_error: `${name}: created ${created}; failed ${failures.join(" | ")}` });
   back({ stream_ok: created > 0 ? `${name}: created ${created} subscription(s)` : `${name}: already subscribed` });
@@ -174,7 +143,7 @@ export async function subscribeStream(form: FormData) {
 
 /** Re-read an Amazon account's advertising profiles (e.g. after access to a new brand was granted). */
 export async function refreshProfiles(form: FormData) {
-  await requireUser();
+  const me = await requireAdminAccess();
   if (isDemoMode()) redirect("/settings/connections?error=demo");
   const id = String(form.get("id") ?? "");
   const db = createAdminClient();

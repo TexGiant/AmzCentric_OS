@@ -1,13 +1,14 @@
 import { Card, CardHeader, Empty, PageHeader, Pill, buttonClass, cn } from "@/components/ui";
 import { CopyField } from "@/components/copy-field";
 import { disconnectClaude } from "@/app/claude-actions";
-import { requireUser } from "@/lib/auth";
+import { requireAccess } from "@/lib/access";
+import { can } from "@/lib/rbac";
 import { mcpResource } from "@/lib/oauth";
 import { oauthStore } from "@/lib/oauth/store";
 import { Bot } from "lucide-react";
 
 const TOOLS: Array<[string, string]> = [
-  ["list_brands", "All brands with last-7-day performance"],
+  ["list_brands", "Your brands with last-7-day performance"],
   ["get_brand_overview", "Today, yesterday, 7/14/30 days and attention alerts"],
   ["get_what_changed", "Why sales moved: movers, drivers, logged actions"],
   ["get_campaigns", "Campaign performance, filter by SP/SB/SD"],
@@ -28,8 +29,9 @@ const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
 
 export default async function ClaudeConnectorPage() {
-  const user = await requireUser();
-  const connections = await oauthStore().listConnections(user.role === "admin" ? null : user.id);
+  const a = await requireAccess();
+  const adminView = can(a, "connector_admin");
+  const connections = await oauthStore().listConnections(adminView ? null : a.userId);
   const url = mcpResource();
 
   return (
@@ -76,7 +78,7 @@ export default async function ClaudeConnectorPage() {
           </div>
         </Card>
         <Card className="xl:col-span-2">
-          <CardHeader title="What Claude can do" sub="Read everything; write only to the Action Log. Nothing in Amazon changes." />
+          <CardHeader title="What Claude can do" sub="Exactly what you can do in the app: your brands, your role's pages and actions. Nothing in Amazon changes." />
           <ul className="divide-y divide-line">
             {TOOLS.map(([name, desc]) => (
               <li key={name} className="flex items-start gap-3 px-6 py-2.5">
@@ -94,7 +96,7 @@ export default async function ClaudeConnectorPage() {
       </div>
 
       <Card className="mt-4">
-        <CardHeader title={user.role === "admin" ? "Active connections (everyone)" : "Your active connections"} />
+        <CardHeader title={adminView ? "Active connections (everyone)" : "Your active connections"} />
         {connections.length === 0 ? (
           <Empty icon={<Bot className="size-8" strokeWidth={1.5} />} title="No Claude connections yet">
             Connect from Claude using the steps above. Each connection appears here.
@@ -106,7 +108,7 @@ export default async function ClaudeConnectorPage() {
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-ink">
                     {c.clientName}
-                    {user.role === "admin" && c.email ? <span className="font-normal text-muted"> · {c.email}</span> : null}
+                    {adminView && c.email ? <span className="font-normal text-muted"> · {c.email}</span> : null}
                   </div>
                   <div className="text-xs text-muted">
                     Connected {fmt(c.createdAt)} · last used {fmt(c.lastUsedAt)}

@@ -7,6 +7,7 @@ import { todayInTz } from "@/lib/dates";
 import { isDemoMode, siteUrl } from "@/lib/env";
 import { MAX_NOTES_CHARS, analysisEnabled, analyzeMeeting } from "@/lib/meetings/analyze";
 import { meetingStore } from "@/lib/meetings/store";
+import { audit } from "@/lib/audit";
 
 /*
  * POST /api/meetings/ingest — lets a recorder (via Zapier, Make, n8n or a script) push
@@ -101,7 +102,10 @@ export async function POST(req: Request) {
     externalId: first(body, "external_id", "meeting_id", "id").slice(0, 200) || null,
     createdBy: first(body, "created_by", "organizer_email", "host_email").slice(0, 200) || "recorder",
   });
-  if (!duplicate) after(() => analyzeMeeting(meeting.id));
+  if (!duplicate) {
+    await audit({ action: "meeting.create", via: "webhook", actorEmail: meeting.createdBy, brand: brand.slug, target: meeting.id, detail: { title: meeting.title } });
+    after(() => analyzeMeeting(meeting.id));
+  }
 
   return NextResponse.json(
     {

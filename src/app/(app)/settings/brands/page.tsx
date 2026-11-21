@@ -2,11 +2,11 @@ import Link from "next/link";
 import { Card, CardHeader, PageHeader, buttonClass, cn, inputClass } from "@/components/ui";
 import { BrandForm } from "@/components/settings-forms";
 import { deleteBrand, renameBrand } from "@/app/settings-actions";
-import { requireUser } from "@/lib/auth";
+import { requireAdminAccess } from "@/lib/access";
 import { data } from "@/lib/data";
 
 export default async function BrandsPage() {
-  const user = await requireUser();
+  const user = await requireAdminAccess();
   const brands = await data().listBrands();
   return (
     <>
@@ -35,7 +35,7 @@ export default async function BrandsPage() {
               <Link href={`/dashboard/${b.slug}`} className={cn(buttonClass.secondary, buttonClass.small)}>
                 Open
               </Link>
-              {user.role === "admin" && (
+              {true && (
                 <form action={deleteBrand}>
                   <input type="hidden" name="slug" value={b.slug} />
                   <button className={buttonClass.danger} title="Deletes the brand, its goals and action log. Profiles become unassigned.">

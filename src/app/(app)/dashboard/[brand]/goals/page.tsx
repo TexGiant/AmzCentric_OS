@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, CardHeader, Kpi, PageHeader, Progress, buttonClass, cn } from "@/components/ui";
 import { Legend, PaceChart } from "@/components/charts";
 import { GoalForm } from "@/components/forms";
+import { can } from "@/lib/rbac";
 import { data } from "@/lib/data";
 import { addDays, daysInMonth, eachDay, monthStart } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
@@ -17,7 +18,7 @@ function shiftMonth(month: string, n: number) {
 export default async function GoalsPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
-  const brand = await getBrandOr404(slug);
+  const brand = await getBrandOr404(slug, "goals.view");
   // Last day with report data, in the marketplace timezone.
   const yesterday = (await brandClock(slug)).through;
   const current = monthStart(yesterday);
@@ -112,10 +113,12 @@ export default async function GoalsPage({ params, searchParams }: { params: Bran
         </div>
       </Card>
 
-      <Card className="mt-4">
-        <CardHeader title={`Set ${monthLabel} targets`} />
-        <GoalForm brand={slug} month={month} goal={goal} />
-      </Card>
+      {can(brand.access, "goals.edit", slug) && (
+        <Card className="mt-4">
+          <CardHeader title={`Set ${monthLabel} targets`} />
+          <GoalForm brand={slug} month={month} goal={goal} />
+        </Card>
+      )}
     </>
   );
 }

@@ -6,10 +6,10 @@ import { AutoRefresh, TaskForm } from "@/components/meeting-forms";
 import { PendingButton } from "@/components/settings-forms";
 import { TaskList } from "@/components/task-list";
 import { Alert, Card, CardHeader, PageHeader, Pill, buttonClass, cn } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
 import { shortDate } from "@/lib/dates";
 import { analysisEnabled } from "@/lib/meetings/analyze";
 import { meetingStore } from "@/lib/meetings/store";
+import { assignableEmails, can, taskScope, visibleTasks } from "@/lib/rbac";
 import { INSIGHT_META, SOURCE_LABEL, STATUS_META } from "@/lib/meetings/ui";
 import { brandClock, getBrandOr404 } from "@/lib/page";
 
@@ -17,13 +17,16 @@ export const maxDuration = 300;
 
 export default async function MeetingPage({ params }: { params: Promise<{ brand: string; id: string }> }) {
   const { brand: slug, id } = await params;
-  const brand = await getBrandOr404(slug);
-  const store = meetingStore();
-  const [user, meeting, clock, team] = await Promise.all([requireUser(), store.getMeeting(id), brandClock(slug), store.teamEmails()]);
+  const brand = await getBrandOr404(slug, "meetings.view");
+  const a = brand.access;
+  const store = meetingStore({ asUser: true });
+  const [meeting, clock, members] = await Promise.all([store.getMeeting(id), brandClock(slug), meetingStore().brandMembers(slug)]);
   if (!meeting || meeting.brandSlug !== slug) notFound();
-  const tasks = await store.listTasks({ meetingId: id });
+  const team = assignableEmails(a, members);
+  const canEdit = can(a, "meetings.edit", slug);
+  const tasks = visibleTasks(a, await store.listTasks({ meetingId: id }));
   // Tasks this meeting closed (they belong to earlier meetings).
-  const closedHere = (await store.listTasks({ brand: slug, status: ["done"] })).filter(
+  const closedHere = visibleTasks(a, await store.listTasks({ brand: slug, status: ["done"] })).filter(
     (t) => t.meetingId !== id && t.completedNote?.includes(`${shortDate(meeting.meetingDate)} meeting`),
   );
   const working = meeting.status === "pending" || meeting.status === "processing";
@@ -44,7 +47,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ brand:
             <Pill tone={st.tone} dot={working}>
               {st.label}
             </Pill>
-            {!working && (
+            {canEdit && !working && (
               <form action={reanalyzeMeeting}>
                 <input type="hidden" name="id" value={meeting.id} />
                 <input type="hidden" name="brand" value={slug} />
@@ -53,13 +56,15 @@ export default async function MeetingPage({ params }: { params: Promise<{ brand:
                 </PendingButton>
               </form>
             )}
-            <form action={deleteMeeting}>
-              <input type="hidden" name="id" value={meeting.id} />
-              <input type="hidden" name="brand" value={slug} />
-              <PendingButton pendingText="Deleting…" className={buttonClass.danger}>
-                <Trash2 className="size-3.5" /> Delete
-              </PendingButton>
-            </form>
+            {canEdit && (
+              <form action={deleteMeeting}>
+                <input type="hidden" name="id" value={meeting.id} />
+                <input type="hidden" name="brand" value={slug} />
+                <PendingButton pendingText="Deleting…" className={buttonClass.danger}>
+                  <Trash2 className="size-3.5" /> Delete
+                </PendingButton>
+              </form>
+            )}
           </div>
         }
       />
@@ -115,9 +120,9 @@ export default async function MeetingPage({ params }: { params: Promise<{ brand:
 
           <Card>
             <CardHeader title="Tasks" sub={tasks.length ? `${tasks.filter((t) => t.status !== "done").length} open of ${tasks.length}` : undefined} />
-            <TaskList tasks={tasks} team={team} today={clock.today} showMeetingLink={false} empty={working ? "Tasks will appear here when the analysis finishes." : "No tasks from this meeting."} />
+            <TaskList tasks={tasks} team={team} today={clock.today} me={a.email} canDeleteAll={taskScope(a) === "all"} showMeetingLink={false} empty={working ? "Tasks will appear here when the analysis finishes." : "No tasks from this meeting."} />
             <div className="border-t border-line">
-              <TaskForm brand={slug} team={team} meetingId={meeting.id} me={user.email} />
+              <TaskForm brand={slug} team={team} meetingId={meeting.id} me={a.email} lockOwner={taskScope(a) === "own"} />
             </div>
           </Card>
         </div>
@@ -136,7 +141,7 @@ export default async function MeetingPage({ params }: { params: Promise<{ brand:
           {closedHere.length > 0 && (
             <Card>
               <CardHeader title="Closed by this meeting" sub="Earlier tasks the notes said were done" />
-              <TaskList tasks={closedHere} team={team} today={clock.today} />
+              <TaskList tasks={closedHere} team={team} today={clock.today} me={a.email} canDeleteAll={taskScope(a) === "all"} />
             </Card>
           )}
           <Card>

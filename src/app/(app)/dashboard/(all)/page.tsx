@@ -2,7 +2,9 @@ import Link from "next/link";
 import { ArrowRight, Tags } from "lucide-react";
 import { Card, CardHeader, Delta, Empty, Eyebrow, Figure, NavyPanel, NavyStat, PageHeader, RangeTabs, buttonClass } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
+import { requireAccess } from "@/lib/access";
 import { data } from "@/lib/data";
+import { isAdmin } from "@/lib/rbac";
 import { resolveRange, shortDate } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
 import { acos, change, sum, tacos } from "@/lib/metrics";
@@ -10,8 +12,9 @@ import { brandClock, param, rangeLabel, type SearchParams } from "@/lib/page";
 
 export default async function AllBrandsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const access = await requireAccess();
   const ds = data();
-  const brands = await ds.listBrands();
+  const brands = await ds.listBrands(); // only the brands this person may see
   // One period for every brand: ends on the last day all brands have reports for.
   const clocks = await Promise.all(brands.map((b) => brandClock(b.slug)));
   const through = clocks.length ? clocks.map((c) => c.through).sort()[0] : undefined;
@@ -23,14 +26,20 @@ export default async function AllBrandsPage({ searchParams }: { searchParams: Se
       <>
         <PageHeader eyebrow="Portfolio" title="All brands" />
         <Card>
-          <Empty icon={<Tags className="size-8" strokeWidth={1.5} />} title="No brands yet">
-            Create a brand, connect an Amazon Ads account, then assign its profiles to the brand.
-            <div className="mt-4">
-              <Link href="/settings/brands" className={buttonClass.primary}>
-                Set up brands
-              </Link>
-            </div>
-          </Empty>
+          {isAdmin(access) ? (
+            <Empty icon={<Tags className="size-8" strokeWidth={1.5} />} title="No brands yet">
+              Create a brand, connect an Amazon Ads account, then assign its profiles to the brand.
+              <div className="mt-4">
+                <Link href="/settings/brands" className={buttonClass.primary}>
+                  Set up brands
+                </Link>
+              </div>
+            </Empty>
+          ) : (
+            <Empty icon={<Tags className="size-8" strokeWidth={1.5} />} title="No brands assigned to you yet">
+              Ask an admin to add you to your brands in Settings → Team.
+            </Empty>
+          )}
         </Card>
       </>
     );

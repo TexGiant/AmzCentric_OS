@@ -29,7 +29,7 @@ const SP = "SP-API";
 export default async function ReportsPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
-  const brand = await getBrandOr404(slug);
+  const brand = await getBrandOr404(slug, "reports");
   const clock = await brandClock(slug);
   const through = clock.through;
 

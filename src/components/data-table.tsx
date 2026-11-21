@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Download, Search } from "lucide-react";
+import { logExport } from "@/app/export-actions";
 import { formatValue, type FormatKind } from "@/lib/format";
 import { badgeClass, buttonClass, cn, type Tone } from "@/components/ui";
 
@@ -69,7 +70,10 @@ export function DataTable({
   const toggle = (key: string) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
+    // Recorded in the audit log; refused when the page's brand isn't one this person can see.
+    const ok = await logExport(exportName ?? "export", filtered.length, window.location.pathname).catch(() => false);
+    if (!ok) return;
     const esc = (v: unknown) => `"${String(v ?? "").replaceAll('"', '""')}"`;
     const csv = [columns.map((c) => esc(c.label)).join(","), ...[...filtered, ...(footer ? [footer] : [])].map((r) => columns.map((c) => esc(r[c.key])).join(","))].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));

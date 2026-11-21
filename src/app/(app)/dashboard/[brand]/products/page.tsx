@@ -9,7 +9,7 @@ import { brandRange, customParams, getBrandOr404, param, rangeLabel, type BrandP
 export default async function ProductsPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
-  const brand = await getBrandOr404(slug);
+  const brand = await getBrandOr404(slug, "products");
   const range = await brandRange(slug, param(sp, "range"), 30, customParams(sp));
   const [now, prev] = await Promise.all([
     data().products(slug, range.from, range.to),

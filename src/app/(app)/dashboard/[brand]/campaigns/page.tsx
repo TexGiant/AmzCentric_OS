@@ -10,7 +10,7 @@ import { brandRange, customParams, getBrandOr404, param, rangeLabel, type BrandP
 export default async function CampaignsPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
-  const brand = await getBrandOr404(slug);
+  const brand = await getBrandOr404(slug, "campaigns");
   const range = await brandRange(slug, param(sp, "range"), 30, customParams(sp));
   const type = param(sp, "type") ?? "all";
 

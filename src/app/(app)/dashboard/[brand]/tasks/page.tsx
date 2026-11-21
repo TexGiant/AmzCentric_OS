@@ -1,9 +1,9 @@
 import { Card, CardHeader, Kpi, PageHeader, Tabs } from "@/components/ui";
 import { TaskForm } from "@/components/meeting-forms";
 import { TaskList, taskCounts } from "@/components/task-list";
-import { requireUser } from "@/lib/auth";
 import { addDays } from "@/lib/dates";
 import { meetingStore } from "@/lib/meetings/store";
+import { assignableEmails, taskScope, visibleTasks } from "@/lib/rbac";
 import { brandClock, getBrandOr404, param, type BrandParams, type SearchParams } from "@/lib/page";
 
 const VIEWS = [
@@ -16,11 +16,14 @@ const VIEWS = [
 export default async function TasksPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
-  const brand = await getBrandOr404(slug);
-  const store = meetingStore();
-  const [user, clock, all, team] = await Promise.all([requireUser(), brandClock(slug), store.listTasks({ brand: slug }), store.teamEmails()]);
+  const brand = await getBrandOr404(slug, "tasks.view");
+  const a = brand.access;
+  const store = meetingStore({ asUser: true });
+  const [clock, rows, members] = await Promise.all([brandClock(slug), store.listTasks({ brand: slug }), meetingStore().brandMembers(slug)]);
+  const all = visibleTasks(a, rows);
+  const team = assignableEmails(a, members);
   const view = VIEWS.some((v) => v.key === param(sp, "view")) ? param(sp, "view")! : "open";
-  const me = user.email.toLowerCase();
+  const me = a.email;
   const pick = {
     open: all.filter((t) => t.status !== "done"),
     mine: all.filter((t) => t.status !== "done" && t.ownerEmail === me),
@@ -42,7 +45,7 @@ export default async function TasksPage({ params, searchParams }: { params: Bran
 
       <Card className="mt-6">
         <CardHeader title="Add a task" />
-        <TaskForm brand={slug} team={team} me={user.email} />
+        <TaskForm brand={slug} team={team} me={a.email} lockOwner={taskScope(a) === "own"} />
       </Card>
 
       <Card className="mt-4">
@@ -55,6 +58,8 @@ export default async function TasksPage({ params, searchParams }: { params: Bran
           }))}
         />
         <TaskList
+          canDeleteAll={taskScope(a) === "all"}
+          me={a.email}
           tasks={pick[view as keyof typeof pick]}
           team={team}
           today={clock.today}

@@ -3,7 +3,7 @@ import { PlugZap, Radio } from "lucide-react";
 import { Alert, Card, CardHeader, Empty, PageHeader, Pill, buttonClass, cn, inputClass, selectClass } from "@/components/ui";
 import { disconnectAccount, refreshProfiles, renameAccount, updateProfile } from "@/app/settings-actions";
 import { PendingButton } from "@/components/settings-forms";
-import { requireUser } from "@/lib/auth";
+import { requireAdminAccess } from "@/lib/access";
 import { REGIONS, type AdsAccount, type Region } from "@/lib/amazon/ads";
 import { AD_TYPES, StreamStatusCells } from "@/components/stream-status";
 import { streamDestinations } from "@/lib/stream/sqs";
@@ -27,7 +27,7 @@ type AccountRow = { id: string; name: string; region: Region; refresh_token: str
 export const maxDuration = 60;
 
 export default async function ConnectionsPage({ searchParams }: { searchParams: SearchParams }) {
-  const user = await requireUser();
+  const user = await requireAdminAccess();
   const sp = await searchParams;
   const brands = await data().listBrands();
   const demo = isDemoMode();
@@ -124,7 +124,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
                   <Pill tone={enabled ? "good" : "neutral"} dot>
                     {enabled} of {a.amazon_profiles.length} enabled
                   </Pill>
-                  {user.role === "admin" && (
+                  {true && (
                     <form action={disconnectAccount}>
                       <input type="hidden" name="id" value={a.id} />
                       <button className={buttonClass.danger}>Disconnect</button>

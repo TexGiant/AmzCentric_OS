@@ -27,29 +27,39 @@ import {
   Search,
   Tags,
   Target,
+  ScrollText,
   Users,
   X,
 } from "lucide-react";
 import { Avatar, cn, Logo, selectClass } from "@/components/ui";
+import type { AccessSummary, Perm } from "@/lib/rbac";
 
 type Brand = { slug: string; name: string; countries: string[] };
-type Item = { href: string; label: string; icon: React.ElementType; soon?: string; exact?: boolean };
+type Item = { href: string; label: string; icon: React.ElementType; soon?: string; exact?: boolean; perm?: Perm };
 
 const STROKE = 1.5;
 
 export function Sidebar({
   brands,
-  email,
-  isAdmin,
+  access,
   demo,
   signOut,
+  demoUsers,
+  switchDemoUser,
 }: {
+  /** Only the brands this person may see (filtered on the server). */
   brands: Brand[];
-  email: string;
-  isAdmin: boolean;
+  access: AccessSummary;
   demo: boolean;
   signOut: () => Promise<void>;
+  /** Dev-only sample users (demo mode). */
+  demoUsers?: Array<{ id: string; label: string; active: boolean }>;
+  switchDemoUser?: (form: FormData) => Promise<void>;
 }) {
+  const email = access.email;
+  const isAdmin = access.admin;
+  const perms = new Set(access.perms);
+  const allowed = (i: Item) => !i.perm || perms.has(i.perm);
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -66,46 +76,51 @@ export function Sidebar({
         {
           label: "Workspace",
           items: [
-            { href: `/dashboard/${slug}`, label: "Overview", icon: LayoutGrid, exact: true },
-            { href: `/dashboard/${slug}/reports`, label: "Reports", icon: FileSpreadsheet },
-            { href: `/dashboard/${slug}/what-changed`, label: "What Changed", icon: GitCompareArrows },
-            { href: `/dashboard/${slug}/goals`, label: "Goals", icon: Target },
+            { href: `/dashboard/${slug}`, label: "Overview", icon: LayoutGrid, exact: true, perm: "overview" },
+            { href: `/dashboard/${slug}/reports`, label: "Reports", icon: FileSpreadsheet, perm: "reports" },
+            { href: `/dashboard/${slug}/what-changed`, label: "What Changed", icon: GitCompareArrows, perm: "what_changed" },
+            { href: `/dashboard/${slug}/goals`, label: "Goals", icon: Target, perm: "goals.view" },
           ],
         },
         {
           label: "Advertising",
           items: [
-            { href: `/dashboard/${slug}/campaigns`, label: "Campaigns", icon: Megaphone },
-            { href: `/dashboard/${slug}/search-terms`, label: "Search Terms", icon: Search },
-            { href: `/dashboard/${slug}/hourly`, label: "Hourly", icon: Clock },
+            { href: `/dashboard/${slug}/campaigns`, label: "Campaigns", icon: Megaphone, perm: "campaigns" },
+            { href: `/dashboard/${slug}/search-terms`, label: "Search Terms", icon: Search, perm: "search_terms" },
+            { href: `/dashboard/${slug}/hourly`, label: "Hourly", icon: Clock, perm: "hourly" },
           ],
         },
         {
           label: "Products & market",
           items: [
-            { href: `/dashboard/${slug}/products`, label: "Products", icon: Package },
-            { href: `/dashboard/${slug}/inventory`, label: "Inventory", icon: Boxes, soon: "SP-API" },
+            { href: `/dashboard/${slug}/products`, label: "Products", icon: Package, perm: "products" },
+            { href: `/dashboard/${slug}/inventory`, label: "Inventory", icon: Boxes, soon: "SP-API", perm: "catalog_inventory" },
           ],
         },
         {
           label: "Work",
           items: [
-            { href: `/dashboard/${slug}/meetings`, label: "Meetings", icon: MessagesSquare },
-            { href: `/dashboard/${slug}/tasks`, label: "Tasks", icon: ListTodo },
-            { href: `/dashboard/${slug}/actions`, label: "Action Log", icon: ListChecks },
+            { href: `/dashboard/${slug}/meetings`, label: "Meetings", icon: MessagesSquare, perm: "meetings.view" },
+            { href: `/dashboard/${slug}/tasks`, label: "Tasks", icon: ListTodo, perm: "tasks.view" },
+            { href: `/dashboard/${slug}/actions`, label: "Action Log", icon: ListChecks, perm: "actions.view" },
           ],
         },
       ]
+        .map((g) => ({ ...g, items: (g.items as Item[]).filter(allowed) }))
+        .filter((g) => g.items.length > 0)
     : [];
 
-  const settings: Item[] = [
-    { href: "/settings/connections", label: "Connections", icon: PlugZap },
-    { href: "/settings/brands", label: "Brands", icon: Tags },
-    { href: "/settings/sync", label: "Data Sync", icon: Database },
+  // Settings are admin-only, except connecting your own Claude.
+  const settings: Item[] = ([
+    { href: "/settings/team", label: "Team", icon: Users, perm: "settings" as Perm },
+    { href: "/settings/brands", label: "Brands", icon: Tags, perm: "settings" as Perm },
+    { href: "/settings/connections", label: "Connections", icon: PlugZap, perm: "settings" as Perm },
+    { href: "/settings/sync", label: "Data Sync", icon: Database, perm: "settings" as Perm },
+    { href: "/settings/meetings", label: "Meeting capture", icon: NotebookPen, perm: "settings" as Perm },
+    { href: "/settings/audit", label: "Audit log", icon: ScrollText, perm: "audit_log" as Perm },
     { href: "/settings/claude", label: "Claude connector", icon: Bot },
-    { href: "/settings/meetings", label: "Meeting capture", icon: NotebookPen },
-    ...(isAdmin ? [{ href: "/settings/team", label: "Team", icon: Users }] : []),
-  ];
+  ] as Item[]).filter(allowed);
+  void isAdmin;
 
   const isActive = (href: string, exact?: boolean) => (exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
 
@@ -160,8 +175,11 @@ export function Sidebar({
       <nav className="mt-5 flex-1 space-y-5 overflow-y-auto px-4 pb-6">
         <div>
           <NavItem href="/dashboard" label="All Brands" icon={BarChart3} active={pathname === "/dashboard"} />
-          <NavItem href="/tasks" label="My Tasks" icon={ListTodo} active={pathname === "/tasks"} />
+          {perms.has("tasks.view") && <NavItem href="/tasks" label="My Tasks" icon={ListTodo} active={pathname === "/tasks"} />}
         </div>
+        {brands.length === 0 && (
+          <p className="rounded-lg bg-surface px-3 py-2.5 text-xs text-muted">No brands assigned to you yet. Ask an admin to add you to a brand.</p>
+        )}
         {groups.map((g) => (
           <Section key={g.label} label={g.label}>
             {g.items.map((i) => (
@@ -178,6 +196,26 @@ export function Sidebar({
 
       <div className="border-t border-line px-4 py-4">
         {demo && <div className="mb-3 rounded-lg bg-gold-100 px-3 py-2 text-xs font-bold text-gold-800">Demo data: connect Supabase to go live</div>}
+        {demo && demoUsers && switchDemoUser && (
+          <form action={switchDemoUser} className="mb-3">
+            <label className="block">
+              <span className="mb-1 block px-1 text-[10px] font-bold tracking-[0.14em] text-faint uppercase">Dev · view as</span>
+              <select
+                name="user"
+                aria-label="View as sample user"
+                defaultValue={demoUsers.find((u) => u.active)?.id}
+                onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                className={cn(selectClass, "h-9 text-xs")}
+              >
+                {demoUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </form>
+        )}
         <div className="flex items-center gap-3 px-1">
           <Avatar email={email} />
           <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink-2" title={email}>

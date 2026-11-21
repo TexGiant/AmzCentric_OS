@@ -66,22 +66,14 @@ export function makeSupabaseSource(getDb: GetDb): DataSource {
 
   async brandStatus(brand) {
     const db = await getDb();
-    const [{ count }, through, campaigns] = await Promise.all([
+    const [{ count }, through, campaigns, stream] = await Promise.all([
       db.from("amazon_profiles").select("profile_id", { count: "exact", head: true }).eq("brand_slug", brand).eq("enabled", true),
       db.rpc("brand_data_through", { p_brand: brand }),
-      db.from("amazon_profiles").select("profile_id, timezone, campaigns(campaign_id)").eq("brand_slug", brand).eq("enabled", true),
+      db.from("amazon_profiles").select("profile_id, timezone").eq("brand_slug", brand).eq("enabled", true),
+      // Raw Stream tables are admin-only under RLS; this function checks the brand itself.
+      db.rpc("brand_stream_last_hour", { p_brand: brand }),
     ]);
-    const ids = (campaigns.data ?? []).flatMap((p) => ((p.campaigns ?? []) as { campaign_id: string }[]).map((c) => c.campaign_id));
-    let streamLastHour: string | null = null;
-    if (ids.length) {
-      const { data } = await db
-        .from("stream_traffic")
-        .select("time_window_start")
-        .in("campaign_id", ids.slice(0, 300))
-        .order("time_window_start", { ascending: false })
-        .limit(1);
-      streamLastHour = (data?.[0]?.time_window_start as string) ?? null;
-    }
+    const streamLastHour = (stream.data as string | null) ?? null;
     return {
       profiles: count ?? 0,
       dataThrough: (through.data as string | null) ?? null,

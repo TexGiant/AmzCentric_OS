@@ -7,11 +7,13 @@ import { siteUrl } from "@/lib/env";
 import { MAX_NOTES_CHARS, analysisEnabled, analyzeMeeting, applyAnalysis } from "@/lib/meetings/analyze";
 import { INSIGHT_TYPES, TASK_PRIORITIES, TASK_STATUSES, meetingStore, type Meeting, type Task, type TaskPatch } from "@/lib/meetings/store";
 import type { McpUser } from "@/lib/oauth";
+import { assignableEmails, canSeeBrand, canSeeTask, taskScope, visibleTasks, type Access } from "@/lib/rbac";
 
 /* Meetings + tasks tools for the AmzCentric OS connector. */
 
 type Deps = {
   user: McpUser;
+  access: Access;
   brandOf: (input: string) => Promise<Brand>;
   today: (slug: string) => Promise<string>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,11 +53,15 @@ export function registerMeetingTools(server: McpServer, d: Deps) {
   const READ = { readOnlyHint: true, openWorldHint: false } as const;
   const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } as const;
 
-  async function ownerFor(owner: string | null | undefined) {
+  const a0 = d.access;
+  const assignable = async (brand: string) => assignableEmails(a0, await store.brandMembers(brand));
+
+  /** Same rule as the app: only teammates this person may assign to on the brand; anyone else is a name. */
+  async function ownerFor(owner: string | null | undefined, brand: string) {
     const s = splitOwner(owner);
     if (s.owner_email) {
-      const team = (await store.teamEmails()).map((e) => e.toLowerCase());
-      if (!team.includes(s.owner_email)) return { ownerEmail: null, ownerName: owner!.trim() };
+      if (!(await assignable(brand)).includes(s.owner_email)) d.fail(`You can't assign tasks to ${s.owner_email} on this brand.`);
+      if (taskScope(a0) === "own" && s.owner_email !== a0.email) d.fail("Your role can only create tasks for yourself.");
       return { ownerEmail: s.owner_email, ownerName: null };
     }
     return { ownerEmail: null, ownerName: s.owner_name };
@@ -124,19 +130,28 @@ export function registerMeetingTools(server: McpServer, d: Deps) {
         });
 
         if (provided) {
+          const allowed = await assignable(b.slug);
+          const open = visibleTasks(a0, await store.listTasks({ brand: b.slug, status: ["open", "in_progress"] }));
+          const closable = new Set(open.map((t) => t.id));
           const { created, closed } = await applyAnalysis(
             meeting,
             {
               summary: a.summary ?? "",
               insights: (a.insights ?? []).map((i) => ({ type: i.type, title: i.title, detail: i.detail ?? "" })),
-              tasks: (a.tasks ?? []).map((t) => ({
+              tasks: (a.tasks ?? []).map((t) => {
+                const o = splitOwner(t.owner);
+                // Teammates the caller can't assign to are kept as a plain name, not an assignment.
+                const ok = o.owner_email && allowed.includes(o.owner_email);
+                return {
                 title: t.title,
                 detail: t.detail ?? null,
-                ...splitOwner(t.owner),
+                owner_email: ok ? o.owner_email : null,
+                owner_name: ok ? null : (o.owner_email ?? o.owner_name),
                 due_date: t.due_date ?? null,
                 priority: t.priority ?? "medium",
-              })),
-              completed_tasks: (a.completed_task_ids ?? []).map((id) => ({ id, evidence: "noted in the meeting" })),
+                };
+              }),
+              completed_tasks: (a.completed_task_ids ?? []).filter((id) => closable.has(id)).map((id) => ({ id, evidence: "noted in the meeting" })),
               next_meeting_agenda: a.next_meeting_agenda ?? [],
             },
             { source: "claude", createdBy: d.user.email },
@@ -183,7 +198,8 @@ export function registerMeetingTools(server: McpServer, d: Deps) {
     },
     d.run(async (a: { brand: string; limit?: number }) => {
       const b = await d.brandOf(a.brand);
-      const [meetings, tasks] = await Promise.all([store.listMeetings(b.slug, a.limit ?? 10), store.listTasks({ brand: b.slug })]);
+      const [meetings, rows] = await Promise.all([store.listMeetings(b.slug, a.limit ?? 10), store.listTasks({ brand: b.slug })]);
+      const tasks = visibleTasks(a0, rows);
       return {
         brand: b.name,
         meetings: meetings.map((m) => {
@@ -216,8 +232,9 @@ export function registerMeetingTools(server: McpServer, d: Deps) {
     },
     d.run(async (a: { meeting_id: string }) => {
       const m = await store.getMeeting(a.meeting_id.trim());
-      if (!m) d.fail(`No meeting with id ${a.meeting_id}.`);
-      const tasks = await store.listTasks({ meetingId: m!.id });
+      // A meeting on a brand they can't see looks exactly like one that doesn't exist.
+      if (!m || !canSeeBrand(a0, m.brandSlug)) d.fail(`No meeting with id ${a.meeting_id}.`);
+      const tasks = visibleTasks(a0, await store.listTasks({ meetingId: m!.id }));
       return {
         id: m!.id,
         brand: m!.brandSlug,
@@ -253,17 +270,17 @@ export function registerMeetingTools(server: McpServer, d: Deps) {
     d.run(async (a: { brand?: string; status?: "open" | "done" | "all"; owner?: string; overdue_only?: boolean; limit?: number }) => {
       const b = a.brand ? await d.brandOf(a.brand) : null;
       const status = a.status ?? "open";
-      let tasks = await store.listTasks({
+      let tasks = visibleTasks(a0, await store.listTasks({
         brand: b?.slug,
         status: status === "open" ? ["open", "in_progress"] : status === "done" ? ["done"] : undefined,
-      });
+      }));
       if (a.owner) {
         const o = a.owner.trim().toLowerCase() === "me" ? d.user.email.toLowerCase() : a.owner.trim().toLowerCase();
         tasks = tasks.filter((t) => t.ownerEmail?.toLowerCase() === o || t.ownerName?.toLowerCase().includes(o) || t.ownerEmail?.split("@")[0] === o);
       }
       const today = await d.today(b?.slug ?? "");
       if (a.overdue_only) tasks = tasks.filter((t) => t.status !== "done" && t.dueDate && t.dueDate < today);
-      return { today, count: tasks.length, tasks: tasks.slice(0, a.limit ?? 50).map(taskOut), team: await store.teamEmails() };
+      return { today, count: tasks.length, tasks: tasks.slice(0, a.limit ?? 50).map(taskOut), assignable: b ? await assignable(b.slug) : undefined };
     }),
   );
 
@@ -295,7 +312,7 @@ export function registerMeetingTools(server: McpServer, d: Deps) {
           meetingId: a.meeting_id ?? null,
           title: a.title.trim(),
           detail: a.detail?.trim() || null,
-          ...(await ownerFor(a.owner)),
+          ...(await ownerFor(a.owner ?? a0.email, b.slug)),
           dueDate: a.due_date ?? null,
           priority: a.priority ?? "medium",
           source: "claude",
@@ -335,7 +352,8 @@ export function registerMeetingTools(server: McpServer, d: Deps) {
         priority?: (typeof TASK_PRIORITIES)[number];
       }) => {
         const existing = await store.getTask(a.task_id.trim());
-        if (!existing) d.fail(`No task with id ${a.task_id}.`);
+        // Tasks they can't see look exactly like tasks that don't exist.
+        if (!existing || !canSeeTask(a0, existing)) d.fail(`No task with id ${a.task_id}.`);
         if (a.due_date && !YMD.test(a.due_date)) d.fail("due_date must be YYYY-MM-DD.");
         const patch: TaskPatch = {
           status: a.status,
@@ -343,7 +361,7 @@ export function registerMeetingTools(server: McpServer, d: Deps) {
           detail: a.detail === undefined ? undefined : a.detail.trim() || null,
           dueDate: a.due_date === undefined ? undefined : a.due_date || null,
           priority: a.priority,
-          ...(a.owner === undefined ? {} : await ownerFor(a.owner)),
+          ...(a.owner === undefined ? {} : await ownerFor(a.owner, existing!.brandSlug)),
         };
         let t = await store.updateTask(existing!.id, patch);
         if (t && a.status === "done") t = await store.updateTask(t.id, { completedNote: a.note?.trim() || `Marked done by ${d.user.email} via Claude` });

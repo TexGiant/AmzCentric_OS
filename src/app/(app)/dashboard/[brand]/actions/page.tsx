@@ -8,12 +8,14 @@ import { IMPACT_WINDOW, measureActions } from "@/lib/action-impact";
 import { money, pct } from "@/lib/format";
 import { acos, change } from "@/lib/metrics";
 import { brandClock, getBrandOr404, type BrandParams } from "@/lib/page";
+import { allowedActionCategories, can } from "@/lib/rbac";
 
 const WINDOW = IMPACT_WINDOW;
 
 export default async function ActionLogPage({ params }: { params: BrandParams }) {
   const { brand: slug } = await params;
-  const brand = await getBrandOr404(slug);
+  const brand = await getBrandOr404(slug, "actions.view");
+  const access = brand.access;
   const ds = data();
   const clock = await brandClock(slug);
   const today = clock.today;
@@ -45,14 +47,21 @@ export default async function ActionLogPage({ params }: { params: BrandParams })
         <Kpi label="Lifted sales/day >5%" value={scored ? pct(wins / scored, 0) : "—"} sub={`${wins} of ${scored}`} />
       </div>
 
-      <Card className="mt-6">
-        <CardHeader title="Log an action" />
-        <ActionForm
-          brand={slug}
-          today={today}
-          campaigns={campaigns.map((c) => ({ id: c.campaignId, name: c.name })).sort((a, b) => a.name.localeCompare(b.name))}
-        />
-      </Card>
+      {can(access, "actions.log", slug) && (
+        <Card className="mt-6">
+          <CardHeader title="Log an action" sub={can(access, "actions.log_all", slug) ? undefined : "Your role logs listing and price / coupon changes."} />
+          <ActionForm
+            brand={slug}
+            today={today}
+            categories={allowedActionCategories(access, ACTION_CATEGORIES.map((c) => c.value))}
+            campaigns={
+              can(access, "campaigns", slug)
+                ? campaigns.map((c) => ({ id: c.campaignId, name: c.name })).sort((a, b) => a.name.localeCompare(b.name))
+                : []
+            }
+          />
+        </Card>
+      )}
 
       <Card className="mt-4">
         <CardHeader title="History" />
@@ -108,6 +117,7 @@ export default async function ActionLogPage({ params }: { params: BrandParams })
                       )}
                     </td>
                     <td className="py-3 pr-6 text-right">
+                      {(can(access, "tasks.team", slug) || a.authorEmail?.toLowerCase() === access.email) && can(access, "actions.log", slug) && (
                       <form action={deleteAction}>
                         <input type="hidden" name="id" value={a.id} />
                         <input type="hidden" name="brand" value={slug} />
@@ -115,6 +125,7 @@ export default async function ActionLogPage({ params }: { params: BrandParams })
                           <Trash2 className="size-4" strokeWidth={1.5} />
                         </button>
                       </form>
+                      )}
                     </td>
                   </tr>
                 );

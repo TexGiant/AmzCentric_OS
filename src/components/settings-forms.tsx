@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Loader2, Play, RefreshCw, Radio } from "lucide-react";
-import { createBrand, inviteMember } from "@/app/settings-actions";
+import { createBrand } from "@/app/settings-actions";
 import type { FormState } from "@/app/workspace-actions";
 import { buttonClass, cn, inputClass, labelClass, segmentedClass, segmentedItemClass, selectClass } from "@/components/ui";
 
@@ -28,31 +28,6 @@ export function BrandForm() {
       </label>
       <button className={buttonClass.primary} disabled={pending}>
         {pending ? "Creating…" : "Add brand"}
-      </button>
-      <div className="basis-full">
-        <Status state={state} />
-      </div>
-    </form>
-  );
-}
-
-export function InviteForm() {
-  const [state, action, pending] = useActionState(inviteMember, {});
-  return (
-    <form action={action} className="flex flex-wrap items-end gap-4 p-6">
-      <label className="min-w-64 flex-1">
-        <span className={labelClass}>Work email</span>
-        <input type="email" name="email" placeholder="name@amzcentric.com" className={inputClass} required />
-      </label>
-      <label className="w-40">
-        <span className={labelClass}>Role</span>
-        <select name="role" className={selectClass} defaultValue="member">
-          <option value="member">Member</option>
-          <option value="admin">Admin</option>
-        </select>
-      </label>
-      <button className={buttonClass.primary} disabled={pending}>
-        {pending ? "Sending…" : "Send invite"}
       </button>
       <div className="basis-full">
         <Status state={state} />

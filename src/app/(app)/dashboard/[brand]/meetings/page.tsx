@@ -5,6 +5,7 @@ import { MeetingForm } from "@/components/meeting-forms";
 import { shortDate } from "@/lib/dates";
 import { analysisEnabled } from "@/lib/meetings/analyze";
 import { meetingStore } from "@/lib/meetings/store";
+import { can, visibleTasks } from "@/lib/rbac";
 import { SOURCE_LABEL, STATUS_META } from "@/lib/meetings/ui";
 import { brandClock, getBrandOr404, type BrandParams } from "@/lib/page";
 
@@ -13,12 +14,14 @@ export const maxDuration = 300;
 
 export default async function MeetingsPage({ params }: { params: BrandParams }) {
   const { brand: slug } = await params;
-  const brand = await getBrandOr404(slug);
-  const store = meetingStore();
+  const brand = await getBrandOr404(slug, "meetings.view");
+  const a = brand.access;
+  const canEdit = can(a, "meetings.edit", slug);
+  const store = meetingStore({ asUser: true });
   const [clock, meetings, tasks] = await Promise.all([
     brandClock(slug),
     store.listMeetings(slug, 100),
-    store.listTasks({ brand: slug }),
+    store.listTasks({ brand: slug }).then((t) => visibleTasks(a, t)),
   ]);
   const aiEnabled = analysisEnabled();
   const byMeeting = new Map<string, { total: number; open: number }>();
@@ -51,6 +54,7 @@ export default async function MeetingsPage({ params }: { params: BrandParams }) 
         />
       </div>
 
+      {canEdit && (
       <div className="mt-6 grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader title="Add meeting notes" sub="Claude reads the notes alongside this brand's live numbers and open tasks." />
@@ -82,14 +86,17 @@ export default async function MeetingsPage({ params }: { params: BrandParams }) 
               <div>
                 <div className="font-bold text-ink">From a recorder</div>
                 <p className="mt-1 text-muted">Fireflies, Otter, Fathom or Google Meet notes can be pushed in by Zapier with no copy-paste.</p>
-                <Link href="/settings/meetings" className="mt-1 inline-block text-xs font-semibold text-brand-ink hover:underline">
-                  Webhook setup →
-                </Link>
+                {a.roles.includes("admin") && (
+                  <Link href="/settings/meetings" className="mt-1 inline-block text-xs font-semibold text-brand-ink hover:underline">
+                    Webhook setup →
+                  </Link>
+                )}
               </div>
             </div>
           </div>
         </Card>
       </div>
+      )}
 
       <Card className="mt-4">
         <CardHeader title="History" />

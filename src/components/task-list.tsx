@@ -35,13 +35,19 @@ export function TaskList({
   tasks,
   team,
   today,
+  me,
+  canDeleteAll = false,
   brandNames,
   empty = "No tasks yet.",
   showMeetingLink = true,
 }: {
   tasks: Task[];
-  team: string[];
+  /** Who each brand's tasks may be assigned to (owner picker), by brand slug or one list for all. */
+  team: string[] | Record<string, string[]>;
   today: string;
+  /** Signed-in email: people without "all tasks" scope may only delete tasks they created. */
+  me?: string;
+  canDeleteAll?: boolean;
   /** Show the brand on each row (cross-brand views). */
   brandNames?: Record<string, string>;
   empty?: string;
@@ -106,7 +112,7 @@ export function TaskList({
                   <summary className="mt-1 hidden w-fit cursor-pointer list-none text-[11px] font-semibold text-faint group-hover:inline-flex hover:text-brand-ink group-open/edit:inline-flex">
                     <Pencil className="mr-1 size-3" /> Edit
                   </summary>
-                  <TaskEditForm task={t} team={team} />
+                  <TaskEditForm task={t} team={Array.isArray(team) ? team : (team[t.brandSlug] ?? [])} />
                 </details>
               </div>
 
@@ -126,6 +132,7 @@ export function TaskList({
                     <RotateCcw className="size-3" /> Reopen
                   </StatusButton>
                 )}
+                {(canDeleteAll || (me && t.createdBy?.toLowerCase() === me.toLowerCase())) && (
                 <form action={deleteTask}>
                   <input type="hidden" name="id" value={t.id} />
                   <input type="hidden" name="brand" value={t.brandSlug} />
@@ -134,6 +141,7 @@ export function TaskList({
                     <span className="sr-only">Delete task</span>
                   </PendingButton>
                 </form>
+                )}
               </div>
             </div>
           </li>

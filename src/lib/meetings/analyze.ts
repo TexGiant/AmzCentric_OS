@@ -163,7 +163,7 @@ export async function applyAnalysis(
   opts: { source: "ai" | "claude"; createdBy: string | null },
 ): Promise<{ created: Task[]; closed: Task[] }> {
   const store = meetingStore();
-  const team = new Set((await store.teamEmails()).map((e) => e.toLowerCase()));
+  const team = new Set((await store.brandMembers(meeting.brandSlug)).map((e: string) => e.toLowerCase()));
   const open = await store.listTasks({ brand: meeting.brandSlug, status: ["open", "in_progress"] });
   const openIds = new Set(open.map((t) => t.id));
 
@@ -232,7 +232,7 @@ export async function analyzeMeeting(meetingId: string): Promise<void> {
     const brandName = brands.find((b) => b.slug === meeting.brandSlug)?.name ?? meeting.brandSlug;
     const [context, team, open] = await Promise.all([
       brandContext(ds, meeting.brandSlug),
-      store.teamEmails(),
+      store.brandMembers(meeting.brandSlug),
       store.listTasks({ brand: meeting.brandSlug, status: ["open", "in_progress"], limit: 100 }),
     ]);
 

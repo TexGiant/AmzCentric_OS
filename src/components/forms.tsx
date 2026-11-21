@@ -15,10 +15,13 @@ export function ActionForm({
   brand,
   today,
   campaigns,
+  categories,
 }: {
   brand: string;
   today: string;
   campaigns: Array<{ id: string; name: string }>;
+  /** Categories this person's role may log. */
+  categories: string[];
 }) {
   const [state, action, pending] = useActionState(addAction, {});
   return (
@@ -30,8 +33,8 @@ export function ActionForm({
       </label>
       <label className="md:col-span-2">
         <span className={labelClass}>Category</span>
-        <select name="category" className={selectClass} defaultValue="bid">
-          {ACTION_CATEGORIES.map((c) => (
+        <select name="category" className={selectClass} defaultValue={categories[0]}>
+          {ACTION_CATEGORIES.filter((c) => categories.includes(c.value)).map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
             </option>

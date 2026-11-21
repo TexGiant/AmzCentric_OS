@@ -1,7 +1,7 @@
 import { Card, CardHeader, Kpi, PageHeader, Pill } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
 import { SyncPanel } from "@/components/settings-forms";
-import { requireUser } from "@/lib/auth";
+import { requireAdminAccess } from "@/lib/access";
 import { isDemoMode } from "@/lib/env";
 import { REPORT_SPECS, type ReportType } from "@/lib/pipeline/report-specs";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,7 +22,7 @@ type Job = {
 };
 
 export default async function SyncPage() {
-  await requireUser();
+  await requireAdminAccess();
   const demo = isDemoMode();
   let jobs: Job[] = [];
   let profiles: Array<{ id: string; label: string }> = [];

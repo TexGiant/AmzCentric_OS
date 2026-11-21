@@ -13,6 +13,7 @@ function back(req: NextRequest, params: Record<string, string>) {
 export async function GET(req: NextRequest) {
   const user = await getUser();
   if (!user) return NextResponse.redirect(new URL("/login", req.url));
+  if (user.role !== "admin") return NextResponse.redirect(new URL("/dashboard", req.url));
 
   const sp = req.nextUrl.searchParams;
   if (sp.get("error")) return back(req, { error: sp.get("error_description") ?? sp.get("error")! });

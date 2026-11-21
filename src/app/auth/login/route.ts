@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedEmail } from "@/lib/env";
 import { safeNext } from "@/lib/safe-next";
+import { audit } from "@/lib/audit";
 
 /*
  * Email + password sign-in as a real form POST. Browsers only offer "Save password?"
@@ -32,10 +33,15 @@ export async function POST(req: NextRequest) {
   });
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return back(error.message);
+  if (error) {
+    await audit({ action: "auth.sign_in_failed", actorEmail: email, detail: { reason: error.message } });
+    return back(error.message);
+  }
   if (!isAllowedEmail(data.user?.email)) {
     await supabase.auth.signOut();
+    await audit({ action: "auth.blocked_domain", actorEmail: email });
     return back("That email domain is not allowed.");
   }
+  await audit({ action: "auth.sign_in", actor: { userId: data.user.id, email: data.user.email ?? email }, detail: { method: "password" } });
   return res;
 }

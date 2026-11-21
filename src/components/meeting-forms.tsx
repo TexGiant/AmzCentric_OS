@@ -64,7 +64,20 @@ function OwnerInput({ team, defaultValue, id }: { team: string[]; defaultValue?:
   );
 }
 
-export function TaskForm({ brand, team, meetingId, me }: { brand: string; team: string[]; meetingId?: string; me: string }) {
+export function TaskForm({
+  brand,
+  team,
+  meetingId,
+  me,
+  lockOwner = false,
+}: {
+  brand: string;
+  team: string[];
+  meetingId?: string;
+  me: string;
+  /** PPC / catalog managers create tasks for themselves only. */
+  lockOwner?: boolean;
+}) {
   const [state, action, pending] = useActionState(createTask, {});
   return (
     <form action={action} className="grid gap-4 p-6 md:grid-cols-12" key={state.ok ? `ok-${Date.now()}` : "form"}>
@@ -76,7 +89,14 @@ export function TaskForm({ brand, team, meetingId, me }: { brand: string; team: 
       </label>
       <label className="md:col-span-3">
         <span className={labelClass}>Owner</span>
-        <OwnerInput team={team} defaultValue={me} id={`team-${meetingId ?? brand}`} />
+        {lockOwner ? (
+          <>
+            <input type="hidden" name="owner" value={me} />
+            <input value={`${me} (you)`} readOnly className={cn(inputClass, "bg-canvas text-muted")} />
+          </>
+        ) : (
+          <OwnerInput team={team} defaultValue={me} id={`team-${meetingId ?? brand}`} />
+        )}
       </label>
       <label className="md:col-span-2">
         <span className={labelClass}>Due</span>

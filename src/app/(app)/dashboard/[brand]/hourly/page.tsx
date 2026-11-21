@@ -12,7 +12,7 @@ const div = (a: number, b: number) => (b > 0 ? a / b : null);
 export default async function HourlyPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
-  const brand = await getBrandOr404(slug);
+  const brand = await getBrandOr404(slug, "hourly");
   const ds = data();
   const status = await ds.brandStatus(slug);
   const today = todayInTz(status.timezone);

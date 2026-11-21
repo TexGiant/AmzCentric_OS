@@ -2,7 +2,11 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { addDays, todayUtc } from "@/lib/dates";
 import { isDemoMode } from "@/lib/env";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { DEMO_USERS } from "@/lib/demo-users";
+import { canSeeBrand } from "@/lib/rbac";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Weekly brand meetings and their tasks. Supabase in production (service role — callers
@@ -77,7 +81,8 @@ export interface MeetingStore {
   createTasks(tasks: NewTask[]): Promise<Task[]>;
   updateTask(id: string, patch: TaskPatch): Promise<Task | null>;
   deleteTask(id: string): Promise<void>;
-  teamEmails(): Promise<string[]>;
+  /** Emails of everyone who can see this brand (admins + people assigned to it). */
+  brandMembers(brand: string): Promise<string[]>;
 }
 
 // ── Supabase ───────────────────────────────────────────────────────────
@@ -179,16 +184,22 @@ export function sortTasks(tasks: Task[]): Task[] {
   );
 }
 
-const supabaseStore: MeetingStore = {
+/**
+ * Reads go through `readDb`: the signed-in person's client for pages (RLS applies), or the
+ * service role for server jobs and the connector (which check access in code). Writes always
+ * use the service role, after the caller has checked permissions.
+ */
+function makeSupabaseStore(readDb: () => Promise<SupabaseClient> | SupabaseClient): MeetingStore {
+  return {
   async listMeetings(brand, limit = 50) {
-    const db = createAdminClient();
+    const db = await readDb();
     const rows = check(
       await db.from("meetings").select("*").eq("brand_slug", brand).order("meeting_date", { ascending: false }).order("created_at", { ascending: false }).limit(limit),
     );
     return (rows ?? []).map(toMeeting);
   },
   async getMeeting(id) {
-    const rows = check(await createAdminClient().from("meetings").select("*").eq("id", id).limit(1));
+    const rows = check(await (await readDb()).from("meetings").select("*").eq("id", id).limit(1));
     return rows?.[0] ? toMeeting(rows[0]) : null;
   },
   async createMeeting(m) {
@@ -210,7 +221,7 @@ const supabaseStore: MeetingStore = {
     check(await db.from("meetings").delete().eq("id", id));
   },
   async listTasks(f) {
-    let q = createAdminClient().from("tasks").select("*");
+    let q = (await readDb()).from("tasks").select("*");
     if (f.brand) q = q.eq("brand_slug", f.brand);
     if (f.status?.length) q = q.in("status", f.status);
     if (f.owner) q = q.ilike("owner_email", f.owner);
@@ -219,7 +230,7 @@ const supabaseStore: MeetingStore = {
     return sortTasks((rows ?? []).map(toTask));
   },
   async getTask(id) {
-    const rows = check(await createAdminClient().from("tasks").select("*").eq("id", id).limit(1));
+    const rows = check(await (await readDb()).from("tasks").select("*").eq("id", id).limit(1));
     return rows?.[0] ? toTask(rows[0]) : null;
   },
   async createTasks(tasks) {
@@ -237,11 +248,26 @@ const supabaseStore: MeetingStore = {
   async deleteTask(id) {
     check(await createAdminClient().from("tasks").delete().eq("id", id));
   },
-  async teamEmails() {
-    const rows = check(await createAdminClient().from("app_users").select("email").order("email"));
-    return (rows ?? []).map((r: { email: string }) => r.email);
+  async brandMembers(brand) {
+    const db = createAdminClient();
+    const [roles, assigned, users] = await Promise.all([
+      db.from("user_roles").select("user_id, role"),
+      db.from("user_brands").select("user_id").eq("brand_slug", brand),
+      db.from("app_users").select("user_id, email"),
+    ]);
+    const byUser = new Map<string, string[]>();
+    for (const r of (roles.data ?? []) as Array<{ user_id: string; role: string }>) byUser.set(r.user_id, [...(byUser.get(r.user_id) ?? []), r.role]);
+    const onBrand = new Set(((assigned.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
+    return ((users.data ?? []) as Array<{ user_id: string; email: string }>)
+      .filter((u) => {
+        const rs = byUser.get(u.user_id) ?? [];
+        return rs.includes("admin") || (onBrand.has(u.user_id) && rs.some((r) => r !== "admin"));
+      })
+      .map((u) => u.email.toLowerCase())
+      .sort();
   },
-};
+  };
+}
 
 // ── Demo (in memory) ───────────────────────────────────────────────────
 
@@ -303,9 +329,9 @@ function seed(): Mem {
   return {
     meetings: [meeting],
     tasks: [
-      t("Cut broad auto bids 15% and move the budget to exact", { ownerEmail: "demo@amzcentric.com", dueDate: addDays(lastWeek, 1), priority: "high", status: "done", completedAt: now }),
-      t("Set up 20% Black Friday coupon", { ownerEmail: "demo@amzcentric.com", dueDate: addDays(today, 2), priority: "high", status: "in_progress" }),
-      t("Build SB video campaign for the gift set", { ownerName: "Jehan", dueDate: addDays(today, 1), detail: "Use the 15s gift-set video; target gift + candle set keywords." }),
+      t("Cut broad auto bids 15% and move the budget to exact", { ownerEmail: "ali@amzcentric.com", dueDate: addDays(lastWeek, 1), priority: "high", status: "done", completedAt: now }),
+      t("Set up 20% Black Friday coupon", { ownerEmail: "nina@amzcentric.com", dueDate: addDays(today, 2), priority: "high", status: "in_progress" }),
+      t("Build SB video campaign for the gift set", { ownerEmail: "ali@amzcentric.com", dueDate: addDays(today, 1), detail: "Use the 15s gift-set video; target gift + candle set keywords." }),
       t("Confirm Canada launch timing with ops", { ownerName: "Sarah (Harbor & Pine)", priority: "low" }),
     ],
   };
@@ -404,11 +430,19 @@ const demoStore: MeetingStore = {
   async deleteTask(id) {
     mem().tasks = mem().tasks.filter((t) => t.id !== id);
   },
-  async teamEmails() {
-    return ["demo@amzcentric.com", "ali@amzcentric.com", "jehan@amzcentricllc.com"];
+  async brandMembers(brand) {
+    return DEMO_USERS.filter((u) => canSeeBrand(u, brand)).map((u) => u.email);
   },
 };
 
-export function meetingStore(): MeetingStore {
-  return isDemoMode() ? demoStore : supabaseStore;
+const serviceStore = makeSupabaseStore(createAdminClient);
+const userStore = makeSupabaseStore(createClient);
+
+/**
+ * `asUser: true` for pages and server actions (reads respect the person's RLS policies);
+ * default for server jobs, the webhook and the connector, which check access in code.
+ */
+export function meetingStore(opts: { asUser?: boolean } = {}): MeetingStore {
+  if (isDemoMode()) return demoStore;
+  return opts.asUser ? userStore : serviceStore;
 }

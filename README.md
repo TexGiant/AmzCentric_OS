@@ -11,7 +11,8 @@ Internal Amazon advertising analytics for AmzCentric. One login for the team, on
 - **Goals**: monthly sales / spend / ACOS targets, pacing and month-end projection
 - **Meetings**: paste weekly client-call notes (or save them from Claude, or have a recorder push them). Claude writes a summary, insights tied to the brand's numbers, next week's agenda and tasks, and closes open tasks the call says are done
 - **Tasks**: per-brand task list with owners, due dates and priorities, plus **My Tasks** across every brand
-- **Settings**: Amazon OAuth connections (NA/EU/FE), brands, data sync (backfill and job queue), team invites
+- **Settings** (admins): Amazon OAuth connections (NA/EU/FE), brands, data sync (backfill and job queue), team roles and brand assignments, audit log
+- **Role-based access**: Admin, Brand manager, PPC manager and Catalog manager roles; everyone except admins sees only the brands assigned to them (see *Roles & access*)
 
 The app runs on **demo data** until Supabase is configured, so you can click through everything first: `npm install && npm run dev`.
 
@@ -53,7 +54,8 @@ Marketing Stream ──SNS──► SQS ──(every 10 min)──► stream_tra
 | Path | Auth | Purpose |
 |---|---|---|
 | `/dashboard`, `/dashboard/[brand]/…` | session | All-brands overview + brand pages |
-| `/settings/connections` · `brands` · `sync` · `team` | session (team: admin) | Admin |
+| `/settings/team` · `brands` · `connections` · `sync` · `meetings` · `audit` | session, Admin role | Admin |
+| `/settings/claude` | session | Connect your own Claude (admins see everyone's connections) |
 | `/api/amazon/authorize` → `/api/amazon/callback` | session | Login with Amazon, encrypts token, imports profiles |
 | `/api/backfill`, `/api/poll`, `/api/stream-ingest` | session | Manual triggers (Data Sync page) |
 | `/api/cron/request-daily` · `poll-reports` · `stream-ingest` | `CRON_SECRET` bearer | Vercel Cron |
@@ -128,7 +130,42 @@ Teammates can connect Claude (claude.ai, desktop, mobile, Claude Code) to AmzCen
 - Endpoint: `https://<your domain>/api/mcp` (MCP Streamable HTTP, stateless). `NEXT_PUBLIC_SITE_URL` must be the exact domain people use.
 - Sign-in: built-in OAuth 2.1 server, dynamic client registration, authorization code + PKCE (S256), refresh-token rotation with reuse detection. Each person approves with their own AmzCentric OS login; the same domain/team rules apply. Tokens are stored hashed (`supabase/migrations/0003_claude_connector_oauth.sql`).
 - Allowed redirect URIs: `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback`, `http://localhost:*` (Claude Code / MCP Inspector), plus any in `OAUTH_EXTRA_REDIRECT_URIS`.
-- Tools (`src/lib/mcp/server.ts`, `meeting-tools.ts`): `list_brands`, `get_brand_overview`, `get_what_changed`, `get_campaigns`, `get_search_terms`, `get_products`, `get_hourly`, `get_action_log`, `get_goals`, `get_report`, `list_meetings`, `get_meeting`, `list_tasks` (read-only); `log_action`, `save_meeting_notes`, `create_task`, `update_task` (write to the app as the signed-in user). Nothing can change Amazon.
+- Access: every tool applies the signed-in teammate's roles and brands. Tools their roles don't grant aren't registered for them, `list_brands` returns only their brands, and other brands look like they don't exist. `my_access` tells Claude what the person can see. Every call is in the audit log.
+- Tools (`src/lib/mcp/server.ts`, `meeting-tools.ts`): `my_access`, `list_brands`, `get_brand_overview`, `get_what_changed`, `get_campaigns`, `get_search_terms`, `get_products`, `get_hourly`, `get_action_log`, `get_goals`, `get_report`, `list_meetings`, `get_meeting`, `list_tasks` (read-only); `log_action`, `save_meeting_notes`, `create_task`, `update_task` (write to the app as the signed-in user). Nothing can change Amazon.
+
+## Roles & access
+
+Run `supabase/migrations/0007_roles_and_access.sql` once (after 0001–0006). It's safe to re-run.
+
+On its first run, existing admins stay Admin. Everyone else gets Brand manager + PPC manager + Catalog manager on every existing brand, so nobody is locked out. Narrow it down afterwards in **Settings → Team**. Re-running it never re-grants access you removed. New people start with no roles and no brands (default deny).
+
+| Area | Admin | Brand manager | PPC manager | Catalog manager |
+|---|:-:|:-:|:-:|:-:|
+| Brands visible | all | assigned | assigned | assigned |
+| Overview, Reports, Products | ✓ | ✓ | ✓ | ✓ |
+| What Changed | ✓ | ✓ | | |
+| Goals | edit | edit | | |
+| Campaigns, Search Terms, Hourly | ✓ | ✓ | ✓ | |
+| Action Log | log any | log any | log any | log listing / price & coupon |
+| Meetings | create | create | read | read |
+| Tasks | all | all on their brands, assign to their team | own + assigned | own + assigned |
+| My Tasks, Claude connector (own) | ✓ | ✓ | ✓ | ✓ |
+| Settings, Audit log, future Leads / Audits / Sales / Marketing | ✓ | | | |
+
+- A person can hold several roles; they get the combined permissions on their assigned brands.
+- **Brand managers' teams:** set "Reports to" on a person in Settings → Team. A brand manager sees every task on their brands and can assign tasks to themselves and their direct reports. A task can only go to someone who can see that brand.
+- Defined but granted to nobody yet: `catalog_inventory` (SP-API inventory), `campaign_edit`. A `junior` level is stored per role for a future approval flow (`requiresApproval()` in `src/lib/rbac.ts`), not enforced yet.
+
+**Enforced in three layers:**
+1. **Menu:** the sidebar and brand picker show only permitted pages and brands.
+2. **Server:** brand pages and settings are checked in their layouts before anything streams, so a typed URL to a forbidden brand or page is a real 404, and every page checks again itself. Server actions, API routes and CSV exports check permission and brand. The data layer (`src/lib/data/scoped.ts`) refuses other brands.
+3. **Database:** RLS policies replace `team_read`. They allow rows only for the caller's brands (`my_brands()` / `my_profiles()`), and goals and tasks also check roles. Raw Marketing Stream rows are admin-only and read through brand-checked functions. Writes go through the server.
+
+The rules live in one place, `src/lib/rbac.ts`. The sidebar, the server guards and the Claude connector all use it.
+
+**Audit log** (Settings → Audit log, admins) records sign-ins (and failures), access denials, role and brand changes, CSV exports, Claude connector calls, and every write: actions, goals, meetings, tasks, brands, profiles, syncs. Each entry has who, what, when, which brand and how (app, connector, webhook).
+
+**Demo mode** has a dev-only "View as" switcher at the bottom of the sidebar. It switches between sample users of each role, including a new hire with no roles. It isn't available when connected to Supabase.
 
 ## Meetings & tasks
 

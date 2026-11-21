@@ -1,4 +1,5 @@
 import "server-only";
+import { demoUser } from "@/lib/demo-users";
 import { isDemoMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -99,9 +100,10 @@ function supabaseStore(): OAuthStore {
     async getUser(userId) {
       const { data } = await db().auth.admin.getUserById(userId);
       if (!data.user?.email) return null;
-      const { data: row } = await db().from("app_users").select("role").eq("user_id", userId).maybeSingle();
+      const { data: row } = await db().from("app_users").select("user_id").eq("user_id", userId).maybeSingle();
       if (!row) return null; // removed from the team
-      return { email: data.user.email, role: row.role === "admin" ? "admin" : "member" };
+      const { data: roles } = await db().from("user_roles").select("role").eq("user_id", userId);
+      return { email: data.user.email, role: (roles ?? []).some((r: { role: string }) => r.role === "admin") ? "admin" : "member" };
     },
     async listConnections(userId) {
       let q = db()
@@ -175,18 +177,20 @@ function memoryStore(): OAuthStore {
       const t = m.tokens.get(hash);
       if (t) t.last_used_at = now();
     },
-    async getUser() {
-      return { email: "demo@amzcentric.com", role: "admin" };
+    async getUser(userId) {
+      const u = demoUser(userId);
+      return { email: u.email, role: u.roles.includes("admin") ? "admin" : "member" };
     },
-    async listConnections() {
+    async listConnections(userId) {
       const seen = new Map<string, Connection>();
       m.tokens.forEach((t) => {
         if (t.kind !== "refresh" || t.revoked_at || seen.has(t.family)) return;
+        if (userId && t.user_id !== userId) return;
         seen.set(t.family, {
           family: t.family,
           clientName: m.clients.get(t.client_id)?.client_name || "Claude",
           userId: t.user_id,
-          email: "demo@amzcentric.com",
+          email: demoUser(t.user_id).email,
           createdAt: t.created_at ?? now(),
           lastUsedAt: t.last_used_at ?? null,
         });

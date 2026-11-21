@@ -1,6 +1,8 @@
 import "server-only";
 import { notFound } from "next/navigation";
+import { requirePerm } from "@/lib/access";
 import { data } from "@/lib/data";
+import type { Perm } from "@/lib/rbac";
 import { addDays, customRange, resolveRange, shortDate, todayInTz, type Range } from "@/lib/dates";
 
 export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -11,11 +13,16 @@ export function param(sp: Record<string, string | string[] | undefined>, key: st
   return Array.isArray(v) ? v[0] : v;
 }
 
-export async function getBrandOr404(slug: string) {
+/**
+ * Every brand page starts here: the person must see the brand and hold the page's
+ * permission, or they get a 404 (nothing about the brand is revealed).
+ */
+export async function getBrandOr404(slug: string, perm: Perm) {
+  const access = await requirePerm(perm, slug);
   const brands = await data().listBrands();
   const brand = brands.find((b) => b.slug === slug);
   if (!brand) notFound();
-  return brand;
+  return Object.assign(brand, { access });
 }
 
 /**

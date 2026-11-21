@@ -14,7 +14,7 @@ const DRIVER_TONES = { Traffic: "info", Conversion: "warn", "Order value": "neut
 export default async function WhatChangedPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
-  const brand = await getBrandOr404(slug);
+  const brand = await getBrandOr404(slug, "what_changed");
   const days = [7, 14, 30].includes(Number(param(sp, "range"))) ? Number(param(sp, "range")) : 7;
   const range = await brandRange(slug, String(days), 7);
 

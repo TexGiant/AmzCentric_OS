@@ -21,7 +21,7 @@ type View = keyof typeof VIEWS;
 export default async function SearchTermsPage({ params, searchParams }: { params: BrandParams; searchParams: SearchParams }) {
   const { brand: slug } = await params;
   const sp = await searchParams;
-  const brand = await getBrandOr404(slug);
+  const brand = await getBrandOr404(slug, "search_terms");
   const range = await brandRange(slug, param(sp, "range"), 30, customParams(sp));
   const view = (param(sp, "view") ?? "all") as View;
   const active = VIEWS[view] ? view : "all";

@@ -3,35 +3,51 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireAccess } from "@/lib/access";
+import { audit } from "@/lib/audit";
 import { MAX_NOTES_CHARS, analyzeMeeting } from "@/lib/meetings/analyze";
-import { TASK_PRIORITIES, TASK_STATUSES, meetingStore, type TaskPriority, type TaskStatus } from "@/lib/meetings/store";
+import { TASK_PRIORITIES, TASK_STATUSES, meetingStore, type Task, type TaskPriority, type TaskStatus } from "@/lib/meetings/store";
+import { assignableEmails, can, canSeeTask, taskScope, type Access } from "@/lib/rbac";
 
 export type FormState = { ok?: boolean; error?: string; message?: string };
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const str = (form: FormData, k: string) => String(form.get(k) ?? "").trim();
+const NO = { error: "You don't have access to do that." };
 
 function refresh(brand: string) {
   revalidatePath(`/dashboard/${brand}`, "layout");
   revalidatePath("/tasks");
 }
 
-/** "someone@x.com" → owner_email when on the team; anything else is a free-text owner. */
-async function owner(raw: string) {
+/**
+ * Owner field → owner_email (a teammate this person may assign to on this brand) or
+ * owner_name (someone outside the team, e.g. the client). Emails they can't assign are refused.
+ */
+async function resolveOwner(a: Access, brand: string, raw: string): Promise<{ ownerEmail: string | null; ownerName: string | null } | { error: string }> {
   if (!raw) return { ownerEmail: null, ownerName: null };
-  const team = (await meetingStore().teamEmails()).map((e) => e.toLowerCase());
+  const allowed = assignableEmails(a, await meetingStore().brandMembers(brand));
   const lower = raw.toLowerCase();
-  return team.includes(lower) ? { ownerEmail: lower, ownerName: null } : { ownerEmail: null, ownerName: raw.slice(0, 120) };
+  if (allowed.includes(lower)) return { ownerEmail: lower, ownerName: null };
+  if (raw.includes("@")) return { error: `You can't assign tasks to ${raw} on this brand.` };
+  return { ownerEmail: null, ownerName: raw.slice(0, 120) };
 }
 
+/** The task, if this person may see it (else null — treated as not found). */
+async function visibleTask(a: Access, id: string): Promise<Task | null> {
+  const t = await meetingStore({ asUser: true }).getTask(id);
+  return t && canSeeTask(a, t) ? t : null;
+}
+
+// ── Meetings ────────────────────────────────────────────────────────────
+
 export async function createMeeting(_: FormState, form: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const a = await requireAccess();
   const brand = str(form, "brand");
+  if (!can(a, "meetings.edit", brand)) return NO;
   const title = str(form, "title") || "Weekly call";
   const date = str(form, "meeting_date");
   const notes = str(form, "notes");
-  if (!brand) return { error: "Missing brand." };
   if (!YMD.test(date)) return { error: "Pick the meeting date." };
   if (notes.length < 20) return { error: "Paste the meeting notes or transcript (at least a few lines)." };
   if (notes.length > MAX_NOTES_CHARS) return { error: `Notes are too long (${notes.length.toLocaleString()} characters; max ${MAX_NOTES_CHARS.toLocaleString()}). Split them into two meetings.` };
@@ -44,58 +60,80 @@ export async function createMeeting(_: FormState, form: FormData): Promise<FormS
       meetingDate: date,
       notes,
       source: "paste",
-      createdBy: user.email,
+      createdBy: a.email,
     });
     id = meeting.id;
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not save the meeting." };
   }
+  await audit({ action: "meeting.create", actor: a, brand, target: id, detail: { title, chars: notes.length } });
   // Claude runs after the response is sent; the meeting page polls until it's done.
   after(() => analyzeMeeting(id));
   refresh(brand);
   redirect(`/dashboard/${brand}/meetings/${id}`);
 }
 
-export async function reanalyzeMeeting(form: FormData) {
-  await requireUser();
+async function editableMeeting(a: Access, form: FormData) {
   const id = str(form, "id");
-  const brand = str(form, "brand");
-  await meetingStore().updateMeeting(id, { status: "pending", error: null });
-  after(() => analyzeMeeting(id));
-  refresh(brand);
+  const m = await meetingStore({ asUser: true }).getMeeting(id);
+  return m && can(a, "meetings.edit", m.brandSlug) ? m : null;
+}
+
+export async function reanalyzeMeeting(form: FormData) {
+  const a = await requireAccess();
+  const m = await editableMeeting(a, form);
+  if (!m) return;
+  await meetingStore().updateMeeting(m.id, { status: "pending", error: null });
+  await audit({ action: "meeting.reanalyze", actor: a, brand: m.brandSlug, target: m.id });
+  after(() => analyzeMeeting(m.id));
+  refresh(m.brandSlug);
 }
 
 export async function deleteMeeting(form: FormData) {
-  await requireUser();
-  const id = str(form, "id");
-  const brand = str(form, "brand");
-  await meetingStore().deleteMeeting(id);
-  refresh(brand);
-  redirect(`/dashboard/${brand}/meetings`);
+  const a = await requireAccess();
+  const m = await editableMeeting(a, form);
+  if (!m) return;
+  await meetingStore().deleteMeeting(m.id);
+  await audit({ action: "meeting.delete", actor: a, brand: m.brandSlug, target: m.id, detail: { title: m.title } });
+  refresh(m.brandSlug);
+  redirect(`/dashboard/${m.brandSlug}/meetings`);
 }
 
+// ── Tasks ───────────────────────────────────────────────────────────────
+
 export async function createTask(_: FormState, form: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const a = await requireAccess();
   const brand = str(form, "brand");
+  if (!can(a, "tasks.view", brand)) return NO;
   const title = str(form, "title");
   const due = str(form, "due_date");
   const priority = str(form, "priority") as TaskPriority;
-  if (!brand || !title) return { error: "Give the task a title." };
+  if (!title) return { error: "Give the task a title." };
   if (due && !YMD.test(due)) return { error: "Invalid due date." };
+  const owner = await resolveOwner(a, brand, str(form, "owner"));
+  if ("error" in owner) return owner;
+  const meetingId = str(form, "meeting_id") || null;
+  if (meetingId) {
+    const m = await meetingStore({ asUser: true }).getMeeting(meetingId);
+    if (!m || m.brandSlug !== brand) return NO;
+  }
+  // People who only see their own tasks can't create tasks they wouldn't be able to see.
+  if (taskScope(a) === "own" && owner.ownerEmail && owner.ownerEmail !== a.email) return NO;
   try {
-    await meetingStore().createTasks([
+    const [t] = await meetingStore().createTasks([
       {
         brandSlug: brand,
-        meetingId: str(form, "meeting_id") || null,
+        meetingId,
         title: title.slice(0, 300),
         detail: str(form, "detail") || null,
-        ...(await owner(str(form, "owner"))),
+        ...owner,
         dueDate: due || null,
         priority: TASK_PRIORITIES.includes(priority) ? priority : "medium",
         source: "manual",
-        createdBy: user.email,
+        createdBy: a.email,
       },
     ]);
+    await audit({ action: "task.create", actor: a, brand, target: t.id, detail: { title: t.title, owner: t.ownerEmail ?? t.ownerName } });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not save the task." };
   }
@@ -104,35 +142,47 @@ export async function createTask(_: FormState, form: FormData): Promise<FormStat
 }
 
 export async function setTaskStatus(form: FormData) {
-  await requireUser();
+  const a = await requireAccess();
   const status = str(form, "status") as TaskStatus;
   if (!TASK_STATUSES.includes(status)) return;
-  await meetingStore().updateTask(str(form, "id"), { status });
-  refresh(str(form, "brand"));
+  const t = await visibleTask(a, str(form, "id"));
+  if (!t) return;
+  await meetingStore().updateTask(t.id, { status });
+  await audit({ action: "task.status", actor: a, brand: t.brandSlug, target: t.id, detail: { from: t.status, to: status } });
+  refresh(t.brandSlug);
 }
 
 export async function updateTask(_: FormState, form: FormData): Promise<FormState> {
-  await requireUser();
-  const id = str(form, "id");
-  const brand = str(form, "brand");
+  const a = await requireAccess();
+  const t = await visibleTask(a, str(form, "id"));
+  if (!t) return NO;
   const title = str(form, "title");
   const due = str(form, "due_date");
   const priority = str(form, "priority") as TaskPriority;
   if (!title) return { error: "Title can't be empty." };
   if (due && !YMD.test(due)) return { error: "Invalid due date." };
-  await meetingStore().updateTask(id, {
+  const rawOwner = str(form, "owner");
+  const unchanged = rawOwner.toLowerCase() === (t.ownerEmail ?? t.ownerName ?? "").toLowerCase();
+  const owner = unchanged ? { ownerEmail: t.ownerEmail, ownerName: t.ownerName } : await resolveOwner(a, t.brandSlug, rawOwner);
+  if ("error" in owner) return owner;
+  await meetingStore().updateTask(t.id, {
     title: title.slice(0, 300),
     detail: str(form, "detail") || null,
-    ...(await owner(str(form, "owner"))),
+    ...owner,
     dueDate: due || null,
     priority: TASK_PRIORITIES.includes(priority) ? priority : "medium",
   });
-  refresh(brand);
+  await audit({ action: "task.update", actor: a, brand: t.brandSlug, target: t.id, detail: { title, owner: owner.ownerEmail ?? owner.ownerName } });
+  refresh(t.brandSlug);
   return { ok: true, message: "Saved." };
 }
 
 export async function deleteTask(form: FormData) {
-  await requireUser();
-  await meetingStore().deleteTask(str(form, "id"));
-  refresh(str(form, "brand"));
+  const a = await requireAccess();
+  const t = await visibleTask(a, str(form, "id"));
+  // Managers delete any task they can see; everyone else only tasks they created.
+  if (!t || (taskScope(a) !== "all" && t.createdBy?.toLowerCase() !== a.email)) return;
+  await meetingStore().deleteTask(t.id);
+  await audit({ action: "task.delete", actor: a, brand: t.brandSlug, target: t.id, detail: { title: t.title } });
+  refresh(t.brandSlug);
 }

@@ -9,10 +9,11 @@ import { int, money, pct } from "@/lib/format";
 import { acos, change, sum, tacos, type Totals } from "@/lib/metrics";
 import { attentionItems, type Insight } from "@/lib/insights";
 import { getBrandOr404, type BrandParams } from "@/lib/page";
+import { can } from "@/lib/rbac";
 
 export default async function BrandOverview({ params }: { params: BrandParams }) {
   const { brand: slug } = await params;
-  const brand = await getBrandOr404(slug);
+  const brand = await getBrandOr404(slug, "overview");
   const ds = data();
 
   // "Today" is today in the marketplace's timezone (Amazon Ads console uses the same).
@@ -177,14 +178,17 @@ export default async function BrandOverview({ params }: { params: BrandParams })
               </li>
             ))}
           </ul>
-          <div className="border-t border-line px-6 py-3.5 text-sm">
-            <Link href={`/dashboard/${slug}/what-changed`} className="font-semibold text-brand-ink hover:underline">
-              See what changed →
-            </Link>
-          </div>
+          {can(brand.access, "what_changed", slug) && (
+            <div className="border-t border-line px-6 py-3.5 text-sm">
+              <Link href={`/dashboard/${slug}/what-changed`} className="font-semibold text-brand-ink hover:underline">
+                See what changed →
+              </Link>
+            </div>
+          )}
         </Card>
       </div>
 
+      {can(brand.access, "campaigns", slug) && (
       <Card className="mt-4">
         <CardHeader
           title="Top campaigns · last 7 days"
@@ -212,6 +216,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
           })}
         />
       </Card>
+      )}
     </>
   );
 }

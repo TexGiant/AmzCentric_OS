@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function GET(req: NextRequest) {
   const user = await getUser();
   if (!user) return NextResponse.redirect(new URL("/login", req.url));
+  if (user.role !== "admin") return NextResponse.redirect(new URL("/dashboard", req.url));
   if (isDemoMode()) return NextResponse.redirect(new URL("/settings/connections?error=demo", req.url));
 
   const region = req.nextUrl.searchParams.get("region") ?? "NA";

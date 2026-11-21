@@ -1,4 +1,5 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { loadAccess } from "@/lib/access";
 import { buildMcpServer } from "@/lib/mcp/server";
 import { resourceMetadataUrl, SCOPE, verifyAccessToken } from "@/lib/oauth";
 import { CORS, preflight } from "@/lib/oauth/http";
@@ -26,7 +27,9 @@ async function handle(req: Request) {
   const user = await verifyAccessToken(token);
   if (!user) return unauthorized("invalid_token");
 
-  const server = buildMcpServer(user);
+  // Roles and brands are re-read on every request, so access changes apply immediately.
+  const access = await loadAccess(user.userId, user.email);
+  const server = buildMcpServer(user, access);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
   const res = await transport.handleRequest(req, {

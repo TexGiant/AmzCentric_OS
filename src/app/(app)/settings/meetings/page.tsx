@@ -1,7 +1,7 @@
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Card, CardHeader, PageHeader } from "@/components/ui";
 import { CopyField } from "@/components/copy-field";
-import { requireUser } from "@/lib/auth";
+import { requireAdminAccess } from "@/lib/access";
 import { data } from "@/lib/data";
 import { siteUrl } from "@/lib/env";
 import { analysisEnabled } from "@/lib/meetings/analyze";
@@ -19,7 +19,7 @@ function Check({ ok, label, hint }: { ok: boolean; label: string; hint: string }
 }
 
 export default async function MeetingSettingsPage() {
-  await requireUser();
+  await requireAdminAccess();
   const url = `${siteUrl()}/api/meetings/ingest`;
   const brands = await data().listBrands();
   const example = brands[0]?.slug ?? "mr-assist";

@@ -12,6 +12,9 @@ import { acos, change, cpc, ctr, cvr, roas, sum, type Totals } from "@/lib/metri
 import type { McpUser } from "@/lib/oauth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registerMeetingTools } from "@/lib/mcp/meeting-tools";
+import { audit } from "@/lib/audit";
+import { scopedSource } from "@/lib/data/scoped";
+import { allowedActionCategories, permsOf, type Access, type Perm } from "@/lib/rbac";
 import { DEFAULT_WEEK_START, WEEKDAYS, buckets, buildReport, reportWindow, type Period } from "@/lib/report";
 
 /*
@@ -27,6 +30,7 @@ const INSTRUCTIONS = `AmzCentric OS holds Amazon Advertising data (Sponsored Pro
 - Total sales and TACOS are not available yet (they need SP-API); sales here are ad-attributed.
 - log_action writes to the team's Action Log under the signed-in user's name. Only call it for a change that was actually made (or is being made) in Amazon, one change per entry, with numbers in the description (e.g. "Raised exact bids +15% on top 5 keywords"). Confirm with the user before logging if they haven't explicitly asked you to log it.
 - Meetings & tasks: after a weekly brand call, save_meeting_notes stores the notes on the brand's Meetings tab. Pass the summary, insights and tasks you extracted (call list_tasks first so you don't duplicate open tasks, and pass completed_task_ids for tasks the call says are finished). list_tasks / create_task / update_task manage the team's to-dos; owner "me" is the signed-in teammate.
+- Access follows the signed-in teammate's roles and brands in AmzCentric OS: list_brands shows only their brands, and tools their role doesn't include aren't available. If a brand or tool is missing, they need an admin to grant it in Settings → Team.
 - This connector cannot change anything in Amazon itself.`;
 
 const r2 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 100) / 100);
@@ -66,9 +70,72 @@ class ToolError extends Error {}
 const brandArg = z.string().describe("Brand slug or name, from list_brands (e.g. 'mr-assist' or 'Mr. Assist')");
 const daysArg = z.number().int().min(1).max(90).optional().describe("Number of days ending yesterday (default 30)");
 
-export function buildMcpServer(user: McpUser) {
-  const ds: DataSource = isDemoMode() ? demoSource : adminSource;
+/**
+ * The permission each tool needs. Tools not listed here are never registered (default deny);
+ * a tool the teammate's roles don't grant is not registered for them either, so Claude
+ * never sees it.
+ */
+const TOOL_PERMS: Record<string, Perm | "everyone"> = {
+  my_access: "everyone",
+  list_brands: "overview",
+  get_brand_overview: "overview",
+  get_campaigns: "campaigns",
+  get_search_terms: "search_terms",
+  get_products: "products",
+  get_hourly: "hourly",
+  get_what_changed: "what_changed",
+  get_action_log: "actions.view",
+  get_report: "reports",
+  get_goals: "goals.view",
+  log_action: "actions.log",
+  save_meeting_notes: "meetings.edit",
+  list_meetings: "meetings.view",
+  get_meeting: "meetings.view",
+  list_tasks: "tasks.view",
+  create_task: "tasks.view",
+  update_task: "tasks.view",
+};
+
+/** Arguments worth keeping in the audit log (long free text is trimmed). */
+function auditArgs(args: unknown): Record<string, unknown> {
+  if (!args || typeof args !== "object") return {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args as Record<string, unknown>)) {
+    if (typeof v === "string") out[k] = v.length > 200 ? `${v.slice(0, 200)}… (${v.length} chars)` : v;
+    else if (typeof v === "number" || typeof v === "boolean" || v === null) out[k] = v;
+    else if (Array.isArray(v)) out[k] = `[${v.length} items]`;
+  }
+  return out;
+}
+
+export function buildMcpServer(user: McpUser, access: Access) {
+  // The service-role source, narrowed to this teammate's brands (the connector has no RLS session).
+  const ds: DataSource = scopedSource(isDemoMode() ? demoSource : adminSource, async () => access);
+  const perms = permsOf(access);
   const server = new McpServer({ name: "amzcentric-os", version: "1.0.0" }, { instructions: INSTRUCTIONS });
+
+  // Every tool registration goes through here: permission gate + audit log.
+  const register = server.registerTool.bind(server);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (server as any).registerTool = (name: string, config: any, cb: (...a: any[]) => any) => {
+    const perm = TOOL_PERMS[name];
+    if (!perm || (perm !== "everyone" && !perms.has(perm))) return undefined;
+    // Tools without an input schema are called with (extra) only; with one, (args, extra).
+    const hasArgs = !!config?.inputSchema;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (register as any)(name, config, async (...params: any[]) => {
+      const args = hasArgs ? params[0] : {};
+      if (perm !== "everyone" && !permsOf(access).has(perm)) return fail("Your role doesn't include this.");
+      await audit({
+        action: `connector.${name}`,
+        actor: { userId: access.userId, email: access.email },
+        brand: typeof args?.brand === "string" ? args.brand.trim().toLowerCase() : null,
+        via: "connector",
+        detail: auditArgs(args),
+      });
+      return cb(...params);
+    });
+  };
 
   async function brandOf(input: string): Promise<Brand> {
     const brands = await ds.listBrands();
@@ -105,6 +172,28 @@ export function buildMcpServer(user: McpUser) {
     };
 
   const READ = { readOnlyHint: true, openWorldHint: false } as const;
+
+  server.registerTool(
+    "my_access",
+    {
+      title: "My access",
+      description:
+        "Who the signed-in teammate is in AmzCentric OS: their roles, the brands they can see and what they can do. Use it to explain why a brand or tool isn't available.",
+      annotations: READ,
+    },
+    run(async () => {
+      const brands = await ds.listBrands();
+      return {
+        email: access.email,
+        roles: access.roles,
+        brands: brands.map((b) => ({ slug: b.slug, name: b.name })),
+        can: [...perms].sort(),
+        note: access.roles.length
+          ? "Brands or tools missing? An admin can change roles and brands in AmzCentric OS → Settings → Team."
+          : "No roles yet: ask an AmzCentric OS admin to assign roles and brands in Settings → Team.",
+      };
+    }),
+  );
 
   server.registerTool(
     "list_brands",
@@ -571,6 +660,8 @@ export function buildMcpServer(user: McpUser) {
     },
     run(async (a: { brand: string; category: ActionCategory; description: string; action_date?: string; campaign?: string }) => {
       const b = await brandOf(a.brand);
+      if (!allowedActionCategories(access, ACTION_CATEGORIES.map((c) => c.value)).includes(a.category))
+        throw new ToolError(`Your role can't log "${a.category}" actions. You can log: ${allowedActionCategories(access, ACTION_CATEGORIES.map((c) => c.value)).join(", ")}.`);
       const { today, yesterday } = await clock(b.slug);
       const date = a.action_date ?? today;
       if (date > today) throw new ToolError(`action_date ${date} is in the future (today is ${today}).`);
@@ -592,7 +683,7 @@ export function buildMcpServer(user: McpUser) {
         action_date: date,
         campaign_id: campaign?.id ?? null,
         campaign_name: campaign?.name ?? null,
-        author_email: user.email,
+        author_email: access.email,
       };
       if (isDemoMode()) return { saved: false, note: "Demo mode: nothing is saved.", entry };
       const { data, error } = await createAdminClient().from("action_log").insert(entry).select("id").single();
@@ -603,6 +694,7 @@ export function buildMcpServer(user: McpUser) {
 
   registerMeetingTools(server, {
     user,
+    access,
     brandOf,
     today: async (slug) => (slug ? (await clock(slug)).today : todayInTz("America/Los_Angeles")),
     run,
