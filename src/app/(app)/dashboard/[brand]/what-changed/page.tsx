@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardHeader, Kpi, PageHeader, Segmented } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
+import { MOVER_TOTALS } from "@/lib/table-totals";
 import { data, ACTION_CATEGORIES } from "@/lib/data";
 import { shortDate } from "@/lib/dates";
 import { money, pct } from "@/lib/format";
@@ -46,6 +47,7 @@ export default async function WhatChangedPage({ params, searchParams }: { params
       salesNow: n.sales,
       salesPrev: p.sales,
       salesChange: n.sales - p.sales,
+      costNow: n.cost,
       salesDelta: change(n.sales, p.sales),
       costChange: n.cost - p.cost,
       acosNow: acos(n),
@@ -64,6 +66,8 @@ export default async function WhatChangedPage({ params, searchParams }: { params
       sku: p.sku,
       salesNow: p.sales,
       salesChange: p.sales - b.sales,
+      salesPrev: b.sales,
+      costNow: p.cost,
       salesDelta: change(p.sales, b.sales),
       acosNow: acos(p),
       driver: salesDriver(p, b),
@@ -117,6 +121,8 @@ export default async function WhatChangedPage({ params, searchParams }: { params
         <DataTable
           defaultSort={{ key: "absChange", dir: "desc" }}
           pageSize={15}
+          totals={MOVER_TOTALS}
+          exportName={`${slug}-campaign-movers-${range.from}-${range.to}`}
           searchKeys={["name"]}
           columns={[
             { key: "name", label: "Campaign", width: "30%" },
@@ -138,6 +144,9 @@ export default async function WhatChangedPage({ params, searchParams }: { params
           <DataTable
             defaultSort={{ key: "absChange", dir: "desc" }}
             pageSize={10}
+            searchKeys={["asin", "sku"]}
+            totals={MOVER_TOTALS}
+            exportName={`${slug}-product-movers-${range.from}-${range.to}`}
             columns={[
               { key: "asin", label: "ASIN" },
               { key: "sku", label: "SKU" },

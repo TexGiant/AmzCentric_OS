@@ -1,6 +1,7 @@
 import { Card, Kpi, PageHeader } from "@/components/ui";
 import { RangePicker } from "@/components/date-range";
 import { DataTable } from "@/components/data-table";
+import { AD_TOTALS } from "@/lib/table-totals";
 import { data } from "@/lib/data";
 import { money, pct } from "@/lib/format";
 import { acos, change, sum, withRatios } from "@/lib/metrics";
@@ -38,6 +39,7 @@ export default async function ProductsPage({ params, searchParams }: { params: B
           searchKeys={["asin", "sku"]}
           exportName={`${slug}-products-${range.from}-${range.to}`}
           defaultSort={{ key: "sales", dir: "desc" }}
+          totals={AD_TOTALS}
           columns={[
             { key: "asin", label: "ASIN" },
             { key: "sku", label: "SKU" },
@@ -56,6 +58,8 @@ export default async function ProductsPage({ params, searchParams }: { params: B
               ...withRatios(p),
               asin: p.asin,
               sku: p.sku,
+              salesPrev: b?.sales ?? 0,
+              costPrev: b?.cost ?? 0,
               salesDelta: change(p.sales, b?.sales),
               acosDelta: b ? change(acos(p), acos(b)) : null,
             };

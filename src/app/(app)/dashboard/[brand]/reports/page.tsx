@@ -162,7 +162,20 @@ export default async function ReportsPage({ params, searchParams }: { params: Br
           defaultSort={{ key: "label", dir: "desc" }}
           pageSize={100}
           exportName={`${slug}-${period}-report-${win.from}-${win.to}`}
-          footer={{ label: `Total · ${days} days`, startLabel: report.rows[0]?.startLabel, endLabel: report.rows.at(-1)?.endLabel, ...t }}
+          totals={{
+            label: "Total",
+            sum: ["totalOrders", "ppcOrders", "organicOrders", "totalSales", "ppcSales", "ppcSpend", "clicks"],
+            // SP-API totals only when every period has them (a half-loaded period isn't a total).
+            strict: ["totalOrders", "organicOrders", "totalSales"],
+            ratio: {
+              organicRatio: ["organicOrders", "totalOrders"],
+              ppcRatio: ["ppcOrders", "totalOrders"],
+              tacos: ["ppcSpend", "totalSales"],
+              acos: ["ppcSpend", "ppcSales"],
+              cpc: ["ppcSpend", "clicks"],
+              cvr: ["ppcOrders", "clicks"],
+            },
+          }}
         />
       </Card>
     </>

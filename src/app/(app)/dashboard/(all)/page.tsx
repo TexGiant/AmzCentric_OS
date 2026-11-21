@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Tags } from "lucide-react";
 import { Card, CardHeader, Delta, Empty, Eyebrow, Figure, NavyPanel, NavyStat, PageHeader, RangeTabs, buttonClass } from "@/components/ui";
 import { DataTable } from "@/components/data-table";
+import { AD_TOTALS } from "@/lib/table-totals";
 import { requireAccess } from "@/lib/access";
 import { data } from "@/lib/data";
 import { isAdmin } from "@/lib/rbac";
@@ -104,6 +105,7 @@ export default async function AllBrandsPage({ searchParams }: { searchParams: Se
         <DataTable
           exportName={`brands-${range.from}-${range.to}`}
           defaultSort={{ key: "cost", dir: "desc" }}
+          totals={AD_TOTALS}
           columns={[
             { key: "name", label: "Brand" },
             { key: "cost", label: "Spend", format: "money" },
@@ -117,6 +119,7 @@ export default async function AllBrandsPage({ searchParams }: { searchParams: Se
           rows={rows.map(({ b, now, prev }) => ({
             name: b.name,
             ...now,
+            salesPrev: prev.sales,
             salesDelta: change(now.sales, prev.sales),
             acos: acos(now),
             tacos: tacos(now),

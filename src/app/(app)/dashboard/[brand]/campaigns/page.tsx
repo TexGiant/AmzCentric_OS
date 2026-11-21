@@ -2,6 +2,7 @@ import { Card, Kpi, PageHeader, Tabs } from "@/components/ui";
 import { RangePicker } from "@/components/date-range";
 import { rangeParams } from "@/lib/dates";
 import { DataTable } from "@/components/data-table";
+import { AD_TOTALS } from "@/lib/table-totals";
 import { data } from "@/lib/data";
 import { money, pct } from "@/lib/format";
 import { acos, change, cpc, ctr, cvr, roas, sum, withRatios } from "@/lib/metrics";
@@ -54,6 +55,7 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
           searchKeys={["name"]}
           exportName={`${slug}-campaigns-${range.from}-${range.to}`}
           defaultSort={{ key: "cost", dir: "desc" }}
+          totals={AD_TOTALS}
           columns={[
             { key: "name", label: "Campaign", width: "30%" },
             { key: "adProduct", label: "Type", badge: { SP: "brand", SB: "info", SD: "neutral" } },
@@ -76,6 +78,8 @@ export default async function CampaignsPage({ params, searchParams }: { params: 
             adProduct: c.adProduct,
             state: c.state,
             budget: c.budget,
+            salesPrev: prevById.get(c.campaignId)?.sales ?? 0,
+            costPrev: prevById.get(c.campaignId)?.cost ?? 0,
             salesDelta: change(c.sales, prevById.get(c.campaignId)?.sales),
           }))}
         />

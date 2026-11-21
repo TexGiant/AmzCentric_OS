@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { Card, CardHeader, Figure, Kpi, PageHeader, Segmented } from "@/components/ui";
 import { HourlyChart, HourlyClicksChart, Legend } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
+import { AD_TOTALS } from "@/lib/table-totals";
 import { data } from "@/lib/data";
 import { addDays, shortDate, todayInTz } from "@/lib/dates";
 import { int, money, pct } from "@/lib/format";
@@ -142,6 +143,7 @@ export default async function HourlyPage({ params, searchParams }: { params: Bra
       <Card className="mt-4">
         <DataTable
           defaultSort={{ key: "hour", dir: "asc" }}
+          totals={{ ...AD_TOTALS, label: "Day total" }}
           pageSize={24}
           exportName={`${slug}-hourly-${day}`}
           columns={[

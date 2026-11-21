@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Clock, TrendingDown, TrendingUp } from "lu
 import { Card, CardHeader, IconChip, Kpi, PageHeader, Pill } from "@/components/ui";
 import { Legend, SalesSpendChart } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
+import { AD_TOTALS } from "@/lib/table-totals";
 import { data } from "@/lib/data";
 import { addDays, daysInMonth, eachDay, hourInTz, monthStart, shortDate, todayInTz } from "@/lib/dates";
 import { int, money, pct } from "@/lib/format";
@@ -201,6 +202,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
         <DataTable
           defaultSort={{ key: "cost", dir: "desc" }}
           pageSize={8}
+          totals={{ ...AD_TOTALS, label: "All campaigns" }}
           columns={[
             { key: "name", label: "Campaign" },
             { key: "adProduct", label: "Type", badge: { SP: "brand", SB: "info", SD: "neutral" } },
@@ -212,7 +214,7 @@ export default async function BrandOverview({ params }: { params: BrandParams })
           ]}
           rows={campaignsNow.map((c) => {
             const p = campaignsPrev.find((x) => x.campaignId === c.campaignId);
-            return { ...c, acos: acos(c), acosDelta: p ? change(acos(c), acos(p)) : null };
+            return { ...c, acos: acos(c), salesPrev: p?.sales ?? 0, costPrev: p?.cost ?? 0, acosDelta: p ? change(acos(c), acos(p)) : null };
           })}
         />
       </Card>

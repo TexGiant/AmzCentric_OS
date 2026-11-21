@@ -2,6 +2,7 @@ import { Card, Kpi, PageHeader, Tabs } from "@/components/ui";
 import { RangePicker } from "@/components/date-range";
 import { rangeParams } from "@/lib/dates";
 import { DataTable } from "@/components/data-table";
+import { AD_TOTALS } from "@/lib/table-totals";
 import { data } from "@/lib/data";
 import { money, pct } from "@/lib/format";
 import { acos, sum, withRatios } from "@/lib/metrics";
@@ -59,6 +60,7 @@ export default async function SearchTermsPage({ params, searchParams }: { params
           searchKeys={["searchTerm", "targeting", "campaignName"]}
           exportName={`${slug}-search-terms-${active}-${range.from}-${range.to}`}
           defaultSort={{ key: "cost", dir: "desc" }}
+          totals={AD_TOTALS}
           columns={[
             { key: "searchTerm", label: "Search term", width: "22%" },
             { key: "targeting", label: "Targeting" },
