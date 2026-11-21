@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { inviteMember, saveMember, type TeamFormState } from "@/app/team-actions";
+import { inviteMember, resendInvite, saveMember, sendPasswordReset, type TeamFormState } from "@/app/team-actions";
 import { buttonClass, cn, inputClass, labelClass, selectClass } from "@/components/ui";
 import { ROLE_LABELS, ROLES, type Role } from "@/lib/rbac";
 
@@ -160,6 +160,21 @@ export function MemberForm({
         </button>
         <Status state={state} />
       </div>
+    </form>
+  );
+}
+
+/** Resend a pending invite, or (admins only) email a password reset. */
+export function AccountActions({ userId, invited }: { userId: string; invited: boolean }) {
+  const [state, action, pending] = useActionState(invited ? resendInvite : sendPasswordReset, {});
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-3">
+      <input type="hidden" name="user_id" value={userId} />
+      <button className={cn(buttonClass.secondary, buttonClass.small)} disabled={pending}>
+        {pending && <Loader2 className="size-3.5 animate-spin" />}
+        {invited ? "Resend invite" : "Send password reset"}
+      </button>
+      <Status state={state} />
     </form>
   );
 }

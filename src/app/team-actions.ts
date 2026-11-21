@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireAdminAccess } from "@/lib/access";
 import { audit } from "@/lib/audit";
 import { isAllowedEmail, isDemoMode, siteUrl } from "@/lib/env";
-import { ROLES, type Role } from "@/lib/rbac";
+import { markAdminReset } from "@/lib/password-reset";
+import { ROLE_LABELS, ROLES, type Role } from "@/lib/rbac";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type TeamFormState = { ok?: boolean; error?: string; message?: string };
@@ -31,6 +32,17 @@ async function validate(db: ReturnType<typeof createAdminClient>, userId: string
     if (!data?.length) return "“Reports to” must be a brand manager.";
   }
   return null;
+}
+
+/** "Who invited you, as what, for which brands" for the invite email. */
+async function inviteDetails(db: ReturnType<typeof createAdminClient>, by: string, p: ReturnType<typeof parse>) {
+  const { data } = p.brands.length ? await db.from("brands").select("slug, name").in("slug", p.brands) : { data: [] };
+  const names = (data ?? []).map((b: { name: string }) => b.name).sort();
+  return {
+    invited_by: by,
+    roles_label: p.roles.map((r) => ROLE_LABELS[r]).join(", "),
+    brands_label: p.roles.includes("admin") ? "All brands" : names.join(", "),
+  };
 }
 
 async function adminCount(db: ReturnType<typeof createAdminClient>, excluding?: string) {
@@ -70,7 +82,9 @@ export async function inviteMember(_: TeamFormState, form: FormData): Promise<Te
   const bad = await validate(db, null, p);
   if (bad) return { error: bad };
   const { data, error } = await db.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${siteUrl()}/auth/callback?next=/account/set-password`,
+    redirectTo: `${siteUrl()}/account/set-password`,
+    // Shown in the invite email (see supabase/email-templates/invite.html).
+    data: await inviteDetails(db, me.email, p),
   });
   if (error) return { error: error.message };
   const userId = data.user.id;
@@ -136,4 +150,53 @@ export async function removeMember(form: FormData) {
   await db.auth.admin.deleteUser(id); // cascades to app_users, roles, brands, Claude tokens
   await audit({ action: "team.remove", actor: me, target: target?.email ?? id });
   revalidatePath("/settings/team");
+}
+
+/** Re-send an invite to someone who hasn't accepted yet (a new link; the old one stops working). */
+export async function resendInvite(_: TeamFormState, form: FormData): Promise<TeamFormState> {
+  const me = await requireAdminAccess();
+  if (isDemoMode()) return DEMO;
+  const id = String(form.get("user_id") ?? "");
+  const db = createAdminClient();
+  const { data: u } = await db.auth.admin.getUserById(id);
+  if (!u.user?.email) return { error: "That person no longer exists." };
+  if (u.user.last_sign_in_at) return { error: "They've already signed in. Send a password reset instead." };
+  const [{ data: roles }, { data: brands }] = await Promise.all([
+    db.from("user_roles").select("role").eq("user_id", id),
+    db.from("user_brands").select("brand_slug").eq("user_id", id),
+  ]);
+  const p = {
+    roles: (roles ?? []).map((r: { role: string }) => r.role as Role),
+    brands: (brands ?? []).map((b: { brand_slug: string }) => b.brand_slug),
+    reportsTo: null,
+  };
+  const { error } = await db.auth.admin.inviteUserByEmail(u.user.email, {
+    redirectTo: `${siteUrl()}/account/set-password`,
+    data: await inviteDetails(db, me.email, p),
+  });
+  if (error) return { error: error.message };
+  await audit({ action: "team.invite_resent", actor: me, target: u.user.email });
+  return { ok: true, message: `New invite sent to ${u.user.email}.` };
+}
+
+/**
+ * Admin-only password reset: marks the account, then Supabase emails the person a reset link.
+ * Reset links nobody asked an admin for are refused (see /auth/verify).
+ */
+export async function sendPasswordReset(_: TeamFormState, form: FormData): Promise<TeamFormState> {
+  const me = await requireAdminAccess();
+  if (isDemoMode()) return DEMO;
+  const id = String(form.get("user_id") ?? "");
+  const db = createAdminClient();
+  const { data: u } = await db.auth.admin.getUserById(id);
+  if (!u.user?.email) return { error: "That person no longer exists." };
+  try {
+    await markAdminReset(id, me.email);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Couldn't start the reset." };
+  }
+  const { error } = await db.auth.resetPasswordForEmail(u.user.email, { redirectTo: `${siteUrl()}/account/set-password` });
+  if (error) return { error: error.message };
+  await audit({ action: "team.password_reset", actor: me, target: u.user.email });
+  return { ok: true, message: `Reset email sent to ${u.user.email}. The link works once.` };
 }

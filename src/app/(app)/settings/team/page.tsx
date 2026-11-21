@@ -1,5 +1,5 @@
 import { Avatar, Card, CardHeader, PageHeader, Pill, buttonClass } from "@/components/ui";
-import { InviteForm, MemberForm } from "@/components/team-forms";
+import { AccountActions, InviteForm, MemberForm } from "@/components/team-forms";
 import { removeMember } from "@/app/team-actions";
 import { requireAdminAccess } from "@/lib/access";
 import { data } from "@/lib/data";
@@ -56,7 +56,7 @@ export default async function TeamPage() {
       <PageHeader
         eyebrow="Settings · admin"
         title="Team"
-        subtitle="Give each person roles and brands. People only ever see the brands assigned to them; admins see all."
+        subtitle="Give each person roles and brands. People only ever see the brands assigned to them; admins see all. Password resets are admin-only: open a person → Send password reset."
       />
       <Card>
         <CardHeader title="Invite a teammate" sub="They get an email to set a password, and land on exactly the brands you pick." />
@@ -105,12 +105,15 @@ export default async function TeamPage() {
                     <span className="hidden text-xs font-semibold text-muted group-open:inline">Close</span>
                   </summary>
                   <MemberForm userId={m.id} brands={brands} managers={managers} roles={m.roles} assigned={m.brands} reportsTo={m.reportsTo} />
-                  {m.id !== me.userId && (
-                    <form action={removeMember} className="flex justify-end border-t border-line bg-canvas/50 px-6 py-3">
-                      <input type="hidden" name="user_id" value={m.id} />
-                      <button className={buttonClass.danger}>Remove from team</button>
-                    </form>
-                  )}
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-canvas/50 px-6 py-3">
+                    <AccountActions userId={m.id} invited={m.invited} />
+                    {m.id !== me.userId && (
+                      <form action={removeMember}>
+                        <input type="hidden" name="user_id" value={m.id} />
+                        <button className={buttonClass.danger}>Remove from team</button>
+                      </form>
+                    )}
+                  </div>
                 </details>
               </li>
             );

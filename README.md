@@ -72,8 +72,8 @@ Marketing Stream ──SNS──► SQS ──(every 10 min)──► stream_tra
 2. **SQL Editor** → paste and run `supabase/migrations/0001_init.sql`, then each later file in `supabase/migrations/` in number order (`0002_…`, …).
 3. **Authentication → Sign In / Providers**: turn **off** "Allow new users to sign up". This makes the app invite-only.
 4. **Authentication → URL Configuration**: Site URL `https://os.amzcentric.com`. Add `https://os.amzcentric.com/**` to Redirect URLs (plus `http://localhost:3000/**` for local dev).
-5. **Authentication → Email Templates → Invite user**: change the link to
-   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/account/set-password`
+5. **Authentication → Email Templates**: paste the branded templates from `supabase/email-templates/`. Use `invite.html` for **Invite user** (subject "You're invited to AmzCentric OS") and `recovery.html` for **Reset password** (subject "Reset your AmzCentric OS password"). Their links open `/auth/confirm`, which only uses the one-time link when the person presses the button, so email scanners can't spend it. In **SMTP settings**, set the sender name to "AmzCentric OS".
+   - Password resets are admin-only: Settings → Team → open a person → **Send password reset**. Reset links an admin didn't start are refused. Admins can also **Resend invite** for anyone who hasn't accepted yet.
 6. **Authentication → Users → Add user**: create *your* account with an email listed in `ADMIN_EMAILS`. Invite everyone else from the Team page.
 
 ### 2. Amazon Ads API
