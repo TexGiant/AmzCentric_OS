@@ -11,7 +11,8 @@ import { data } from "@/lib/data";
 export default async function BrandsPage() {
   const user = await requireAdminAccess();
   const brands = await data().listBrands();
-  const settings = new Map((await brandCaseStudySettings()).map((b) => [b.slug, b]));
+  const cs = await brandCaseStudySettings();
+  const settings = new Map(cs.brands.map((b) => [b.slug, b]));
   return (
     <>
       <PageHeader
@@ -47,6 +48,7 @@ export default async function BrandsPage() {
                   </button>
                 </form>
               )}
+              {cs.ready && (
               <form action={saveCaseStudySettings} className="flex basis-full flex-wrap items-end gap-2 rounded-lg bg-canvas/70 px-3 py-2.5">
                 <input type="hidden" name="slug" value={b.slug} />
                 <label className="text-xs font-semibold text-muted">
@@ -65,10 +67,16 @@ export default async function BrandsPage() {
                   Save
                 </PendingButton>
               </form>
+              )}
             </li>
           ))}
         </ul>
       </Card>
+      {!cs.ready && (
+        <p className="mt-3 rounded-lg bg-gold-100 px-3 py-2 text-xs font-semibold text-gold-800">
+          Case study settings appear here after migration 0008_case_study_settings.sql is run in Supabase.
+        </p>
+      )}
       <p className="mt-3 text-xs text-muted">
         Case studies: the case study bot only sees measured Action Log wins from brands marked Allowed, with names, campaigns and ASINs removed.
         Choose "with name" only after the client agrees in writing.{isDemoMode() ? " (Demo mode: settings can't be saved.)" : ""}

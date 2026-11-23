@@ -21,20 +21,35 @@ const DEMO_SETTINGS: Record<string, { category: string; consent: Consent }> = {
   bloomwell: { category: "Beauty", consent: "named" },
 };
 
-/** Category and case study permission for every brand. */
-export async function brandCaseStudySettings(): Promise<BrandMeta[]> {
+/**
+ * Category and case study permission for every brand. Before migration 0008 runs, the
+ * columns don't exist: every brand reads as "not allowed" and `ready` is false, so pages
+ * keep working and the feed returns nothing.
+ */
+export async function brandCaseStudySettings(): Promise<{ brands: BrandMeta[]; ready: boolean }> {
   if (isDemoMode()) {
     const brands = await demoSource.listBrands();
-    return brands.map((b) => ({ slug: b.slug, name: b.name, category: DEMO_SETTINGS[b.slug]?.category ?? null, consent: DEMO_SETTINGS[b.slug]?.consent ?? "none" }));
+    return {
+      ready: true,
+      brands: brands.map((b) => ({ slug: b.slug, name: b.name, category: DEMO_SETTINGS[b.slug]?.category ?? null, consent: DEMO_SETTINGS[b.slug]?.consent ?? "none" })),
+    };
   }
-  const { data, error } = await createAdminClient().from("brands").select("slug, name, category, case_study_consent").order("name");
-  if (error) throw new Error(`Couldn't read brand case study settings (has migration 0008 been run?): ${error.message}`);
-  return (data ?? []).map((b: { slug: string; name: string; category: string | null; case_study_consent: string }) => ({
+  const db = createAdminClient();
+  const { data, error } = await db.from("brands").select("slug, name, category, case_study_consent").order("name");
+  if (error?.code === "42703") {
+    // undefined_column: migration 0008 hasn't been run yet.
+    console.error("case study settings unavailable: run supabase/migrations/0008_case_study_settings.sql");
+    const { data: plain, error: e2 } = await db.from("brands").select("slug, name").order("name");
+    if (e2) throw new Error(e2.message);
+    return { ready: false, brands: (plain ?? []).map((b: { slug: string; name: string }) => ({ slug: b.slug, name: b.name, category: null, consent: "none" as Consent })) };
+  }
+  if (error) throw new Error(`Couldn't read brand case study settings: ${error.message}`);
+  return { ready: true, brands: (data ?? []).map((b: { slug: string; name: string; category: string | null; case_study_consent: string }) => ({
     slug: b.slug,
     name: b.name,
     category: b.category?.trim() || null,
     consent: (CONSENTS as string[]).includes(b.case_study_consent) ? (b.case_study_consent as Consent) : "none",
-  }));
+  })) };
 }
 
 export async function saveBrandCaseStudySettings(slug: string, category: string | null, consent: Consent) {
@@ -54,7 +69,7 @@ export async function caseStudyCandidates(opts: { days: number; limit: number })
   notQualified: Record<string, number>;
 }> {
   const ds: DataSource = isDemoMode() ? demoSource : adminSource;
-  const brands = (await brandCaseStudySettings()).filter((b) => b.consent !== "none");
+  const brands = (await brandCaseStudySettings()).brands.filter((b) => b.consent !== "none");
   let actionsMeasured = 0;
   const notQualified: Record<string, number> = {};
   const all: CaseCandidate[] = [];
