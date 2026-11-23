@@ -1,13 +1,17 @@
 import Link from "next/link";
-import { Card, CardHeader, PageHeader, buttonClass, cn, inputClass } from "@/components/ui";
+import { Card, CardHeader, PageHeader, buttonClass, cn, inputClass, selectClass } from "@/components/ui";
 import { BrandForm } from "@/components/settings-forms";
-import { deleteBrand, renameBrand } from "@/app/settings-actions";
+import { deleteBrand, renameBrand, saveCaseStudySettings } from "@/app/settings-actions";
+import { PendingButton } from "@/components/settings-forms";
+import { brandCaseStudySettings } from "@/lib/case-studies";
+import { isDemoMode } from "@/lib/env";
 import { requireAdminAccess } from "@/lib/access";
 import { data } from "@/lib/data";
 
 export default async function BrandsPage() {
   const user = await requireAdminAccess();
   const brands = await data().listBrands();
+  const settings = new Map((await brandCaseStudySettings()).map((b) => [b.slug, b]));
   return (
     <>
       <PageHeader
@@ -43,10 +47,32 @@ export default async function BrandsPage() {
                   </button>
                 </form>
               )}
+              <form action={saveCaseStudySettings} className="flex basis-full flex-wrap items-end gap-2 rounded-lg bg-canvas/70 px-3 py-2.5">
+                <input type="hidden" name="slug" value={b.slug} />
+                <label className="text-xs font-semibold text-muted">
+                  Category
+                  <input name="category" defaultValue={settings.get(b.slug)?.category ?? ""} placeholder="e.g. Supplements" className={cn(inputClass, "mt-1 h-9 w-48 text-sm")} />
+                </label>
+                <label className="text-xs font-semibold text-muted">
+                  Case studies
+                  <select name="consent" defaultValue={settings.get(b.slug)?.consent ?? "none"} className={cn(selectClass, "mt-1 h-9 w-64 text-sm")}>
+                    <option value="none">Not allowed</option>
+                    <option value="anonymized">Allowed, anonymized (category only)</option>
+                    <option value="named">Allowed with name (client agreed in writing)</option>
+                  </select>
+                </label>
+                <PendingButton pendingText="Saving…" className={cn(buttonClass.secondary, buttonClass.small)}>
+                  Save
+                </PendingButton>
+              </form>
             </li>
           ))}
         </ul>
       </Card>
+      <p className="mt-3 text-xs text-muted">
+        Case studies: the case study bot only sees measured Action Log wins from brands marked Allowed, with names, campaigns and ASINs removed.
+        Choose "with name" only after the client agrees in writing.{isDemoMode() ? " (Demo mode: settings can't be saved.)" : ""}
+      </p>
     </>
   );
 }

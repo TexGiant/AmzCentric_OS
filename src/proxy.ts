@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Claude connector endpoints authenticate with OAuth bearer tokens, not cookies.
-const PUBLIC = ["/login", "/auth/", "/api/cron/", "/account/set-password", "/.well-known/", "/api/oauth/", "/api/mcp", "/api/meetings/ingest"];
+const PUBLIC = ["/login", "/auth/", "/api/cron/", "/account/set-password", "/.well-known/", "/api/oauth/", "/api/mcp", "/api/meetings/ingest", "/api/insights/"];
 
 /**
  * Request headers for the app, with x-pathname set by us (any value the browser sent is
