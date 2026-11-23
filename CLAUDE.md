@@ -3,7 +3,7 @@
 ## How we work
 Zain (owner) asks Claude Code directly, in a session. Claude builds it, tests it, ships it, and tells Zain exactly what he has to do (migrations to run, env vars to set, settings to change). There is no separate planning, review or release bot.
 
-- `main` is protected: changes land through a pull request. Claude opens it and merges it when the checks below pass, unless the change touches a sensitive area (below). Vercel deploys `main` automatically.
+- `main` is protected: changes land through a pull request. Claude opens it once the checks below pass and tells Zain what to check; **Zain clicks Merge**, and Vercel deploys `main` automatically. Claude doesn't merge or push to `main`.
 - Commit messages explain the why. No model names in commits, code comments or PRs.
 - Before merging, tell Zain anything that will break until he acts (e.g. a page that needs a migration). Make code degrade gracefully until then.
 
@@ -24,7 +24,7 @@ Zain (owner) asks Claude Code directly, in a session. Claude builds it, tests it
 
 Before merging: `npm run typecheck`, `npm test` and the build pass; new behaviour has a test where practical, and a bug fix has a test that failed before the fix. Check UI changes in a browser in demo mode.
 
-## Ask Zain before merging changes to these
+## Point these out explicitly in the PR (sensitive areas)
 - Sign-in and accounts: `src/lib/auth.ts`, `src/app/auth/**`, `src/app/login/**`, `src/app/account/**`, `src/lib/oauth/**`, `src/app/api/oauth/**`, `src/lib/password-reset.ts`, `supabase/email-templates/**`
 - Request security: `src/proxy.ts`, `src/lib/public-paths.ts`, the access-check layouts (`src/app/(app)/dashboard/[brand]/layout.tsx`, `src/app/(app)/settings/layout.tsx`)
 - Access control: RLS policies in `supabase/migrations/`, `src/lib/rbac.ts`, `src/lib/access.ts`, `src/lib/data/scoped.ts`, `TOOL_PERMS` in `src/lib/mcp/server.ts`
