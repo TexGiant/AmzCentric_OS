@@ -67,10 +67,17 @@ export async function caseStudyCandidates(opts: { days: number; limit: number })
     const oldest = addDays(through, -opts.days);
     const actions = (await ds.actions(brand.slug, 300)).filter((a) => a.actionDate >= oldest && a.actionDate <= newest);
     if (!actions.length) continue;
-    const [measured, campaigns] = await Promise.all([
+    // Everything that could identify the client in a description: campaigns, products/SKUs,
+    // and the keywords, targets and search terms the brand advertises on.
+    const termsFrom = addDays(oldest, -CASE_STUDY_RULES.windowDays);
+    const [measured, campaigns, products, terms] = await Promise.all([
       measureActions(ds, brand.slug, actions, through),
-      ds.campaigns(brand.slug, oldest, through),
+      ds.campaigns(brand.slug, termsFrom, through),
+      ds.products(brand.slug, termsFrom, through),
+      ds.searchTerms(brand.slug, termsFrom, through),
     ]);
+    const productNames = products.flatMap((p) => [p.sku ?? "", ...(p.sku ?? "").split(/\s+[·|]\s+/)]).filter(Boolean);
+    const keywords = terms.flatMap((t) => [t.searchTerm, t.targeting ?? ""]).filter(Boolean);
     const adTypeOf = new Map(campaigns.map((c) => [c.campaignId, c.adProduct]));
     actionsMeasured += measured.length;
     for (const m of measured) {
@@ -83,6 +90,8 @@ export async function caseStudyCandidates(opts: { days: number; limit: number })
           campaignName: m.a.campaignName,
           adType: m.a.campaignId ? (adTypeOf.get(m.a.campaignId) ?? null) : null,
           otherCampaignNames: campaigns.map((c) => c.name),
+          productNames,
+          keywords,
           afterDays: m.afterDays,
           before: m.before,
           after: m.after,

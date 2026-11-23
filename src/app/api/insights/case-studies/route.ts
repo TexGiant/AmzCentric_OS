@@ -70,7 +70,8 @@ export async function GET(req: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
-    console.error("case study feed failed", e);
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Couldn't build the feed." }, { status: 500 });
+    // Details stay in the server log; the caller only learns that it failed.
+    console.error("case study feed failed", { days, limit, error: e });
+    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
   }
 }

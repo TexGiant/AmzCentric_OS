@@ -31,6 +31,10 @@ export type MeasuredInput = {
   adType: string | null; // SP / SB / SD for campaign-level actions
   /** Every campaign name on the brand, so a description mentioning any of them is masked. */
   otherCampaignNames?: string[];
+  /** The brand's product names / SKUs, masked as [product]. */
+  productNames?: string[];
+  /** The brand's keywords, targets and customer search terms, masked as [keyword]. */
+  keywords?: string[];
   afterDays: number;
   before: Window | null;
   after: Window | null;
@@ -95,24 +99,73 @@ function escapeRe(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/**
- * Removes anything that could identify the client from free text: the brand's name and
- * slug, campaign names, ASINs, SKU-like codes, emails and links.
- */
-export function anonymizeText(text: string, opts: { brandNames: string[]; campaignNames: string[]; keepBrandName?: boolean }): string {
-  let out = text;
-  const names = [...opts.campaignNames].filter((n) => n && n.trim().length >= 4).sort((a, b) => b.length - a.length);
-  for (const n of names) out = out.replace(new RegExp(escapeRe(n.trim()), "gi"), "[campaign]");
-  if (!opts.keepBrandName) {
-    for (const n of opts.brandNames.filter((x) => x && x.trim().length >= 2).sort((a, b) => b.length - a.length)) {
-      out = out.replace(new RegExp(`\\b${escapeRe(n.trim())}\\b`, "gi"), "the brand");
+// Words that are campaign-naming conventions, not product names ("SP | Exact | Vitamin D3" → "Vitamin D3").
+const CAMPAIGN_WORDS = new Set(
+  ("sp sb sd sbv spv sdv exact phrase broad auto automatic manual video display retargeting remarketing conquest conq asin asins kw kws " +
+    "keyword keywords pt product products targeting target category categories brand branded defense defence legacy all old new test " +
+    "research ranking rank launch top tos search store spotlight headline collection us ca uk de mx jp au eu na fe")
+    .split(" "),
+);
+
+/** Product names embedded in campaign names: the parts between "|", "-", "_" or "/" that aren't naming conventions. */
+export function productNamesFromCampaigns(campaignNames: string[]): string[] {
+  const out = new Set<string>();
+  for (const name of campaignNames) {
+    for (const part of name.split(/\s*[|/_]\s*|\s+-\s+/)) {
+      const words = part.trim().split(/\s+/).filter((w) => w && !CAMPAIGN_WORDS.has(w.toLowerCase().replace(/[^a-z0-9]/g, "")));
+      const p = words.join(" ").trim();
+      if (p.length >= 4 && /[a-z]/i.test(p) && !/^\d+$/.test(p)) out.add(p);
     }
   }
+  return [...out];
+}
+
+// Placeholders are inserted as sentinels first, so a later pattern can't re-match the placeholder text.
+const PH = { campaign: "\u0000C\u0000", product: "\u0000P\u0000", keyword: "\u0000K\u0000", brand: "\u0000B\u0000" } as const;
+const LABEL: Record<string, string> = { C: "[campaign]", P: "[product]", K: "[keyword]", B: "the brand" };
+
+/** Masks every term, longest first across all kinds, so "bamboo board large" isn't half-masked by "bamboo board". */
+function maskTerms(text: string, groups: Array<{ terms: string[]; ph: string; minLen: number }>): string {
+  const seen = new Set<string>();
+  const list: Array<{ t: string; ph: string }> = [];
+  for (const g of groups) {
+    for (const raw of g.terms) {
+      const t = raw?.trim();
+      if (!t || t.length < g.minLen || seen.has(t.toLowerCase())) continue;
+      seen.add(t.toLowerCase());
+      list.push({ t, ph: g.ph });
+    }
+  }
+  list.sort((a, b) => b.t.length - a.t.length);
+  let out = text;
+  for (const { t, ph } of list) out = out.replace(new RegExp(`(?<![\\w])${escapeRe(t)}(?![\\w])`, "gi"), ph);
+  return out;
+}
+
+/**
+ * Removes anything that could identify the client from free text: campaign names, product
+ * names and SKUs, keywords and search terms, the brand's name (unless named), ASINs, quoted
+ * phrases (usually keywords), emails and links.
+ */
+export function anonymizeText(
+  text: string,
+  opts: { brandNames: string[]; campaignNames: string[]; productNames?: string[]; keywords?: string[]; keepBrandName?: boolean },
+): string {
+  let out = text;
+  out = maskTerms(out, [
+    { terms: opts.campaignNames, ph: PH.campaign, minLen: 4 },
+    { terms: [...(opts.productNames ?? []), ...productNamesFromCampaigns(opts.campaignNames)], ph: PH.product, minLen: 4 },
+    { terms: opts.keywords ?? [], ph: PH.keyword, minLen: 3 },
+    { terms: opts.keepBrandName ? [] : opts.brandNames, ph: PH.brand, minLen: 2 },
+  ]);
   out = out
     .replace(/\bB0[A-Z0-9]{8}\b/gi, "[ASIN]")
     .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "[email]")
     .replace(/\bhttps?:\/\/\S+/gi, "[link]")
-    .replace(/\b[A-Z0-9]{2,}(?:-[A-Z0-9]+){2,}\b/g, "[SKU]");
+    .replace(/\b[A-Z0-9]{2,}(?:-[A-Z0-9]+){2,}\b/g, "[SKU]")
+    // Quoted phrases are almost always keywords or search terms: "bamboo board", “gift set”, 'xyz'.
+    .replace(/"[^"\n]{2,80}"|“[^”\n]{2,80}”|(?<=^|[\s(])'[^'\n]{2,80}'(?=$|[\s.,;:!?)])/g, PH.keyword)
+    .replace(/\u0000([CPKB])\u0000/g, (_m, k: string) => LABEL[k]);
   return out.replace(/\s{2,}/g, " ").trim();
 }
 
@@ -146,6 +199,8 @@ export function toCandidate(m: MeasuredInput, brand: BrandMeta, rules = CASE_STU
       what: anonymizeText(m.description, {
         brandNames: [brand.name, brand.slug, brand.slug.replace(/-/g, " ")],
         campaignNames: [...(m.campaignName ? [m.campaignName] : []), ...(m.otherCampaignNames ?? [])],
+        productNames: m.productNames,
+        keywords: m.keywords,
         keepBrandName: named,
       }),
       scope: m.campaignId ? "one campaign" : "whole brand",

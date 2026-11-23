@@ -1,7 +1,7 @@
 // Unit tests for the case study rules. Run: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { anonymizeText, candidateId, qualifies, toCandidate } from "../src/lib/case-study-rules.ts";
+import { anonymizeText, candidateId, productNamesFromCampaigns, qualifies, toCandidate } from "../src/lib/case-study-rules.ts";
 
 const win = (over = {}) => ({ cost: 300, sales: 1000, orders: 40, clicks: 400, impressions: 20000, ...over });
 const measured = (before, after, extra = {}) => ({
@@ -77,4 +77,32 @@ test("candidate ids are stable and opaque", () => {
   assert.equal(candidateId("abc"), candidateId("abc"));
   assert.notEqual(candidateId("abc"), candidateId("abd"));
   assert.ok(!candidateId("some-uuid").includes("some-uuid"));
+});
+
+// REVIEWER #3: anonymized mode must hide product names, ASINs, keywords and search terms.
+test("anonymized descriptions hide product names, ASINs, keywords and search terms", () => {
+  const m = measured(win(), win({ sales: 1300 }), {
+    campaignName: "SP | Exact | Bamboo Cutting Board",
+    otherCampaignNames: ["SB | Video | Acacia Serving Tray"],
+    productNames: ["Linen Napkins 12pk"],
+    keywords: ["bamboo cutting board large", "wooden chopping block"],
+    description:
+      "Negated \"cheap cutting board\" and moved spend from wooden chopping block to bamboo cutting board large for Linen Napkins 12pk (B0CZJ2MSFK), Acacia Serving Tray and the Bamboo Cutting Board",
+  });
+  const what = toCandidate(m, brand).change.what;
+  for (const leak of ["cheap cutting board", "wooden chopping block", "bamboo cutting board large", "Linen Napkins", "B0CZJ2MSFK", "Acacia Serving Tray", "Bamboo Cutting Board"]) {
+    assert.ok(!what.toLowerCase().includes(leak.toLowerCase()), `"${leak}" leaked: ${what}`);
+  }
+  assert.equal(what, "Negated [keyword] and moved spend from [keyword] to [keyword] for [product] ([ASIN]), [product] and the [product]");
+});
+
+test("product names are found inside campaign names, naming conventions are not", () => {
+  const found = productNamesFromCampaigns(["SP | Exact | Vitamin D3 + K2", "AC | MRA | Trainer | US | SBV | Legacy | Manual"]);
+  assert.deepEqual(found.sort(), ["Trainer", "Vitamin D3 + K2"]);
+});
+
+test("placeholders are never re-masked, and generic words survive", () => {
+  const out = anonymizeText("Raised bids +15% on top 5 keywords in the campaign", { brandNames: ["Acme"], campaignNames: [], keywords: ["campaign", "keywords"] });
+  assert.equal(out, "Raised bids +15% on top 5 [keyword] in the [keyword]");
+  assert.equal(anonymizeText("Raised bids +15% on exact match", { brandNames: ["Acme"], campaignNames: [] }), "Raised bids +15% on exact match");
 });

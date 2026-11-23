@@ -1,8 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isPublicPath } from "@/lib/public-paths";
 
-// Claude connector endpoints authenticate with OAuth bearer tokens, not cookies.
-const PUBLIC = ["/login", "/auth/", "/api/cron/", "/account/set-password", "/.well-known/", "/api/oauth/", "/api/mcp", "/api/meetings/ingest", "/api/insights/"];
 
 /**
  * Request headers for the app, with x-pathname set by us (any value the browser sent is
@@ -38,7 +37,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  if (!user && !PUBLIC.some((p) => path.startsWith(p))) {
+  if (!user && !isPublicPath(path)) {
     if (path.startsWith("/api/")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const url = request.nextUrl.clone();
     url.pathname = "/login";
