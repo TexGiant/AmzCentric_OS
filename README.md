@@ -178,6 +178,14 @@ Run `supabase/migrations/0005_meetings_tasks.sql` once. Notes reach a brand's **
 
 Pasted and pushed notes are analyzed with the Claude API (`src/lib/meetings/analyze.ts`, structured output) when `ANTHROPIC_API_KEY` is set: Claude gets the notes, the brand's last 7 vs. prior 7 days, top campaigns, goal pacing, recent Action Log entries, the team's emails and the brand's open tasks. It returns a summary, insights (win / risk / opportunity / decision / client request), tasks with owners and due dates, open tasks the call says are done, and next week's agenda. The analysis runs after the response (`after()`), and the meeting page refreshes itself until it's done. Without the key, notes are still saved and tasks can be added by hand or from Claude.
 
+## Case study feed
+
+`GET /api/insights/case-studies` (bearer `INSIGHTS_API_TOKEN`) returns measured Action Log wins, anonymized, for the case study bot (`docs/bots/case-study-bot.md`).
+- Only brands an admin marks **Allowed** in Settings → Brands are included (migration 0008 adds `brands.category` and `case_study_consent`, default "not allowed").
+- Names, campaigns, ASINs and SKUs are stripped, and dates become months.
+- Every call is in the audit log.
+- Rules and tests: `src/lib/case-study-rules.ts`, `tests/case-study-rules.test.mjs` (`npm test`).
+
 ## Brand & design system
 
 The UI follows **AmzCentric CSS v1.0**: white pages, navy `#000F22` ink, amber `#F8A42E` as the one action color, Montserrat for headings and figures, Manrope for everything else.

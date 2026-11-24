@@ -9,6 +9,8 @@ import { createStreamSubscription, isLive, listStreamSubscriptions, STREAM_DATAS
 import { ingestStream, streamDestinations } from "@/lib/stream/sqs";
 import { requireAdminAccess } from "@/lib/access";
 import { audit } from "@/lib/audit";
+import { CONSENTS, type Consent } from "@/lib/case-study-rules";
+import { saveBrandCaseStudySettings } from "@/lib/case-studies";
 import { isDemoMode } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FormState } from "@/app/workspace-actions";
@@ -163,4 +165,18 @@ export async function refreshProfiles(form: FormData) {
   }
   revalidatePath("/", "layout");
   redirect(`/settings/connections?${new URLSearchParams({ refreshed: `${row.name}: ${found} profiles found, ${added} new` })}`);
+}
+
+// ── Case studies ─────────────────────────────────────────────────────
+/** A brand's category and whether its results may be used in case studies. */
+export async function saveCaseStudySettings(form: FormData) {
+  const me = await requireAdminAccess();
+  if (isDemoMode()) return;
+  const slug = String(form.get("slug") ?? "");
+  const category = String(form.get("category") ?? "").trim().slice(0, 60) || null;
+  const consent = String(form.get("consent") ?? "none") as Consent;
+  if (!slug || !CONSENTS.includes(consent)) return;
+  await saveBrandCaseStudySettings(slug, category, consent);
+  await audit({ action: "brand.case_study", actor: me, brand: slug, detail: { category, consent } });
+  revalidatePath("/settings/brands");
 }

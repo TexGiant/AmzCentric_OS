@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --conditions=react-server --import ./tests/support/alias.mjs --test tests/*.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.11.0",
