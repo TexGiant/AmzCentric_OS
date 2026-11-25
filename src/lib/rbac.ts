@@ -35,6 +35,9 @@ export const PERMS = [
   "search_terms",
   "hourly",
   "products",
+  // HR: everyone checks in, requests leave and sees their own time; admins see the team.
+  "hr.self",
+  "hr.manage", // HR page: attendance, leave approvals, everyone's app time; Settings → HR
   // Admin areas
   "settings", // Team, Brands, Connections, Data Sync, Meeting capture
   "audit_log",
@@ -68,6 +71,7 @@ export const ROLE_PERMS: Record<Role, Perm[]> = {
     "search_terms",
     "hourly",
     "products",
+    "hr.self",
   ],
   ppc_manager: [
     "overview",
@@ -81,8 +85,9 @@ export const ROLE_PERMS: Record<Role, Perm[]> = {
     "actions.log_all",
     "tasks.view",
     "meetings.view",
+    "hr.self",
   ],
-  catalog_manager: ["overview", "products", "reports", "actions.view", "actions.log", "tasks.view", "meetings.view"],
+  catalog_manager: ["overview", "products", "reports", "actions.view", "actions.log", "tasks.view", "meetings.view", "hr.self"],
 };
 
 /** Action Log categories a catalog manager may log (coupons are logged under "pricing"). */

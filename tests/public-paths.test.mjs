@@ -21,3 +21,12 @@ test("existing public routes are unchanged and app pages require login", () => {
     assert.equal(isPublicPath(p), false, p);
   }
 });
+
+test("the HR bot API and the fingerprint bridge check their own tokens; the heartbeat needs a login", () => {
+  for (const p of ["/api/hr/bot/requests", "/api/hr/bot/requests/123", "/api/hr/bot/day", "/api/hr/bot/month", "/api/hr/punches"]) {
+    assert.equal(isPublicPath(p), true, p);
+  }
+  for (const p of ["/api/hr/heartbeat", "/api/hr", "/api/hr/bot", "/api/hr/punches/x", "/api/hr/punchesx", "/hr", "/me", "/settings/hr"]) {
+    assert.equal(isPublicPath(p), false, p);
+  }
+});

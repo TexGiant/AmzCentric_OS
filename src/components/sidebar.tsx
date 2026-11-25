@@ -9,6 +9,8 @@ import { startNavigation } from "@/components/nav-progress";
 import {
   BarChart3,
   Bot,
+  CalendarCheck,
+  CalendarCog,
   Boxes,
   Clock,
   Database,
@@ -28,6 +30,7 @@ import {
   Tags,
   Target,
   ScrollText,
+  UserCheck,
   Users,
   X,
 } from "lucide-react";
@@ -117,6 +120,7 @@ export function Sidebar({
     { href: "/settings/connections", label: "Connections", icon: PlugZap, perm: "settings" as Perm },
     { href: "/settings/sync", label: "Data Sync", icon: Database, perm: "settings" as Perm },
     { href: "/settings/meetings", label: "Meeting capture", icon: NotebookPen, perm: "settings" as Perm },
+    { href: "/settings/hr", label: "HR", icon: CalendarCog, perm: "hr.manage" as Perm },
     { href: "/settings/audit", label: "Audit log", icon: ScrollText, perm: "audit_log" as Perm },
     { href: "/settings/claude", label: "Claude connector", icon: Bot },
   ] as Item[]).filter(allowed);
@@ -176,6 +180,8 @@ export function Sidebar({
         <div>
           <NavItem href="/dashboard" label="All Brands" icon={BarChart3} active={pathname === "/dashboard"} />
           {perms.has("tasks.view") && <NavItem href="/tasks" label="My Tasks" icon={ListTodo} active={pathname === "/tasks"} />}
+          {perms.has("hr.self") && <NavItem href="/me" label="My Day" icon={CalendarCheck} active={pathname === "/me"} />}
+          {perms.has("hr.manage") && <NavItem href="/hr" label="HR" icon={UserCheck} active={pathname === "/hr"} />}
         </div>
         {brands.length === 0 && (
           <p className="rounded-lg bg-surface px-3 py-2.5 text-xs text-muted">No brands assigned to you yet. Ask an admin to add you to a brand.</p>
