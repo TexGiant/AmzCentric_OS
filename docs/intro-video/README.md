@@ -35,3 +35,16 @@ node docs/intro-video/launch-data.mjs /tmp/launch/shots   # connects like Claude
 node docs/intro-video/build-launch.js /tmp/launch
 node docs/intro-video/render-video.js /tmp/launch render /tmp/launch/launch-silent.mp4 30
 ```
+
+## HR video SOP
+
+`AmzCentric-OS-HR-Guide.mp4` (~96 s): check-in, leave requests, the policy, who approves, My Day, and the admin HR pages. Run the app in demo mode on :3100 (`DEMO_MODE=true npm run build && PORT=3100 npm start`), then:
+
+```bash
+mkdir -p /tmp/hr/shots && cp -r <fonts dir> /tmp/hr/fonts && cp public/brand/amzcentric-logo.png /tmp/hr/logo.png
+node docs/intro-video/capture-hr.js /tmp/hr/shots     # screenshots + spotlight boxes (clears and restores a demo machine ID for the check-in shot)
+node docs/intro-video/build-hr.js /tmp/hr
+node docs/intro-video/render-video.js /tmp/hr render /tmp/hr/hr-silent.mp4 30
+```
+
+Music: "Safe Momentum" (Imprismed), Epidemic Sound, edited to 96.4 s; mixed in with the same ffmpeg command as the intro video.
