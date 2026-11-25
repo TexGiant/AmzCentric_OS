@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { HrBar } from "@/components/hr-checkin";
 import { Sidebar } from "@/components/sidebar";
 import { signOut } from "@/app/actions";
 import { switchDemoUser } from "@/app/demo-actions";
@@ -24,7 +25,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         switchDemoUser={demo ? switchDemoUser : undefined}
       />
       <main className="lg:pl-[248px]">
-        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-8 sm:py-8">{children}</div>
+        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-8 sm:py-8">
+          <HrBar access={access} />
+          {children}
+        </div>
       </main>
     </div>
   );

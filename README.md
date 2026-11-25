@@ -62,6 +62,10 @@ Marketing Stream ──SNS──► SQS ──(every 10 min)──► stream_tra
 | `/api/cron/request-daily` · `poll-reports` · `stream-ingest` | `CRON_SECRET` bearer | Vercel Cron |
 | `/auth/callback`, `/auth/confirm`, `/account/set-password` | public | Login links and invites |
 | `/api/meetings/ingest` | `MEETINGS_INGEST_TOKEN` bearer | Recorder / Zapier pushes meeting notes |
+| `/me`, `/hr`, `/settings/hr` | session (`/hr` + Settings → HR: Admin) | My day, team attendance & leave, HR settings |
+| `/api/hr/heartbeat` | session | Active minutes in the app (sent by the browser) |
+| `/api/hr/bot/requests` · `requests/{id}` · `day` · `month` | `HR_API_TOKEN` bearer | HR bot: read, approve within policy, escalate |
+| `/api/hr/punches` | `ATTENDANCE_TOKEN` bearer | Fingerprint machine bridge |
 
 ---
 
@@ -151,6 +155,8 @@ On its first run, existing admins stay Admin. Everyone else gets Brand manager +
 | Meetings | create | create | read | read |
 | Tasks | all | all on their brands, assign to their team | own + assigned | own + assigned |
 | My Tasks, Claude connector (own) | ✓ | ✓ | ✓ | ✓ |
+| My Day: check in, request leave, own attendance & app time | ✓ | ✓ | ✓ | ✓ |
+| HR page (everyone's attendance, leave decisions, app time), Settings → HR | ✓ | | | |
 | Settings, Audit log, future Leads / Audits / Sales / Marketing | ✓ | | | |
 
 - A person can hold several roles; they get the combined permissions on their assigned brands.
@@ -185,6 +191,18 @@ Pasted and pushed notes are analyzed with the Claude API (`src/lib/meetings/anal
 - Names, campaigns, ASINs and SKUs are stripped, and dates become months.
 - Every call is in the audit log.
 - Rules and tests: `src/lib/case-study-rules.ts`, `tests/case-study-rules.test.mjs` (`npm test`).
+
+## HR: attendance, leave and app time
+
+Run `supabase/migrations/0009_hr.sql` once (after 0008). Until then the HR pages say so and nothing else changes.
+
+- **My Day** (`/me`, everyone): check in, request leave or WFH, leave balances, own attendance and app time. A check-in prompt shows at the top of every page until the person checks in, punches the fingerprint machine, or is off. Checking in as WFH without a request files one automatically.
+- **HR** (`/hr`, admins): the day board (office / WFH / leave / late / absent, first in and last out, app time, anything odd), leave requests waiting for you or for HR, the month summary, balances, and time in the app per person and per brand.
+- **Settings → HR**: leave policy (defaults: 8 sick, 6 casual, 12 annual, 2 half days a year, 2 WFH days a month; notice 0 / 1 / 3 days), office hours and timezone (Asia/Karachi), working days, holidays, and per person: name, fingerprint machine ID, tracked or not (admins off by default), and leave already taken this year before the app.
+- **Fingerprint machine (ZKTeco K50):** `tools/attendance-bridge` runs on an office PC every 5 minutes and sends new punches to `/api/hr/punches` (bearer `ATTENDANCE_TOKEN`). Without it, upload the machine's USB export (`attlog.dat`) in Settings → HR.
+- **App time:** while the app is open and the person used the mouse or keyboard in the last 5 minutes, the browser sends one heartbeat a minute. Each counts one minute, split by the brand page they're on. Several tabs don't double-count. Work outside the app isn't counted; there are no screenshots or keystroke logs.
+- **HR bot** (`docs/bots/hr-bot.md`, bearer `HR_API_TOKEN`): reads waiting requests with a policy check, approves those within policy, escalates the rest to Zain with a reason, and reads the day board and month summary for reports. It can't decline or change settings. Admins decide escalated requests on the HR page.
+- Rules and tests: `src/lib/hr/policy.ts`, `tests/hr-policy.test.mjs`, `tests/hr-api.test.mjs`.
 
 ## Brand & design system
 

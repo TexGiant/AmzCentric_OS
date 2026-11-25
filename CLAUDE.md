@@ -8,7 +8,7 @@ Zain (owner) asks Claude Code directly, in a session. Claude builds it, tests it
 - Before merging, tell Zain anything that will break until he acts (e.g. a page that needs a migration). Make code degrade gracefully until then.
 
 ## Project
-- App: AmzCentric OS — the AmzCentric team's internal workspace for client brands' Amazon Ads: dashboards, reports, action log, goals, meetings and tasks, a case study feed, plus a Claude connector.
+- App: AmzCentric OS — the AmzCentric team's internal workspace for client brands' Amazon Ads: dashboards, reports, action log, goals, meetings and tasks, a case study feed, HR (attendance, leave, app time), plus a Claude connector.
 - Stack: Next.js 16 (App Router; `src/proxy.ts` replaces middleware), React 19, TypeScript (strict), Tailwind 4, Supabase (Postgres, Auth), deployed on Vercel. Data from the Amazon Ads API (daily reports) and Amazon Marketing Stream (SQS).
 - Live: https://os.amzcentric.com
 - Supabase: Claude never connects to the production project. Test database changes on a local Postgres (with a stub of Supabase's `auth` schema and roles) and app changes in demo mode.
@@ -30,10 +30,11 @@ Before merging: `npm run typecheck`, `npm test` and the build pass; new behaviou
 - Access control: RLS policies in `supabase/migrations/`, `src/lib/rbac.ts`, `src/lib/access.ts`, `src/lib/data/scoped.ts`, `TOOL_PERMS` in `src/lib/mcp/server.ts`
 - Secrets: `src/lib/crypto.ts`, `src/lib/env.ts`, `.env.example`, `vercel.json` crons
 - Anything that changes what a client's data exposes outside the app (Claude connector, case study feed, exports)
+- Employee data (HR): `src/lib/hr/**`, `src/app/api/hr/**`, `src/app/hr-actions.ts`, `tools/attendance-bridge/**`
 
 ## Rules
 - Database changes: a new numbered file in `supabase/migrations/` that is safe to re-run; test it locally; tell Zain to run it in the Supabase SQL editor.
-- Never write secrets, keys or real client data into code, tests, logs, commits or PRs. Use the demo brands (Harbor & Pine, Lumen Labs, Kodiak Trail, Bloomwell) in tests. The repo is public.
+- Never write secrets, keys, real client data or real employee data (names, leave reasons) into code, tests, logs, commits or PRs. Use the demo brands (Harbor & Pine, Lumen Labs, Kodiak Trail, Bloomwell) in tests. The repo is public.
 - Never add code that changes anything in a client's Amazon account. The app only reads from Amazon (the one exception is creating Marketing Stream subscriptions).
 - Smallest change that fixes the root cause. No unrelated refactors.
 - Don't hide problems: no empty catch blocks, no `@ts-ignore` / `eslint-disable` to get past checks, no skipped or weakened tests.
